@@ -1,0 +1,20 @@
+[Desktop Entry]
+Type=Application
+Name=Ajazz AK980 V2
+GenericName=Keyboard settings
+GenericName[uk]=Налаштування клавіатури
+Comment=Screen GIFs and clock, lighting, keys, macros and profiles for the AJAZZ AK980 V2
+Comment[uk]=GIF і годинник на екрані, підсвітка, клавіші, макроси та профілі для AJAZZ AK980 V2
+Exec=ak980-gui
+Icon=io.github.yellowhearth1.AjazzAK980V2
+Terminal=false
+Categories=Settings;HardwareSettings;Utility;
+Keywords=keyboard;ajazz;ak980;rgb;lighting;gif;lcd;macro;клавіатура;підсвітка;
+StartupWMClass=ak980
+SingleMainWindow=true
+Actions=sync-clock;
+
+[Desktop Action sync-clock]
+Name=Sync the keyboard clock
+Name[uk]=Синхронізувати годинник клавіатури
+Exec=ak980 time

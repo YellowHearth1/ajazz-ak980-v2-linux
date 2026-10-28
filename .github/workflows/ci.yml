@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        python: ["3.10", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Qt runtime libraries
+        run: sudo apt-get update && sudo apt-get install -y libegl1 libgl1 libxkbcommon0 libfontconfig1 libdbus-1-3
+      - name: Install
+        run: python -m pip install . pytest pyflakes
+      - name: Lint
+        run: python -m pyflakes ak980 tests tools
+      - name: Tests
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: python -m pytest -q
+
+  arch-package:
+    runs-on: ubuntu-24.04
+    container: archlinux:latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the package from this commit
+        run: |
+          pacman -Syu --noconfirm --needed base-devel python-build python-installer python-setuptools python-wheel \
+            python-pytest python-pyqt6 python-pillow python-numpy qt6-svg ttf-fira-sans ttf-fira-mono
+          useradd -m builder
+          make dist
+          cp dist/*.tar.gz packaging/arch/
+          chown -R builder .
+          su builder -c "cd packaging/arch && makepkg --noconfirm -f"
+          ls -l packaging/arch/*.pkg.tar.zst

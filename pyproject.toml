@@ -1,0 +1,52 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ajazz-ak980-v2-linux"
+description = "Ajazz AK980 V2 | Software for Linux: screen clock and GIFs, lighting, per-key colours, PC lighting effects, key remapping, macros and profiles"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE", "ak980/data/fonts/OFL.txt"]
+authors = [{ name = "yellowhearth1" }]
+requires-python = ">=3.10"
+dependencies = ["PyQt6>=6.4", "Pillow>=9", "numpy>=1.22"]
+keywords = ["ajazz", "ak980", "keyboard", "rgb", "lcd", "gif", "linux", "hidraw"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: X11 Applications :: Qt",
+    "Intended Audience :: End Users/Desktop",
+    "Natural Language :: English",
+    "Natural Language :: Ukrainian",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Topic :: System :: Hardware :: Hardware Drivers",
+]
+dynamic = ["version"]
+
+[project.urls]
+Homepage = "https://github.com/yellowhearth1/ajazz-ak980-v2-linux"
+Issues = "https://github.com/yellowhearth1/ajazz-ak980-v2-linux/issues"
+
+[project.scripts]
+ak980 = "ak980.cli:main"
+
+[project.gui-scripts]
+ak980-gui = "ak980.gui:main"
+
+[tool.setuptools]
+packages = ["ak980", "ak980.gui", "ak980.gui.pages", "ak980.locale"]
+
+[tool.setuptools.dynamic]
+version = { attr = "ak980.__version__" }
+
+[tool.setuptools.package-data]
+ak980 = ["data/*.json", "data/*.rules", "data/*.svg", "data/fonts/*", "data/init/*/*", "data/init/*/*/*",
+         "data/init/*/*/*/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"

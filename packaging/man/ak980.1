@@ -1,0 +1,119 @@
+.TH AK980 1 "2026-10-28" "ak980 0.0.1" "User Commands"
+.SH NAME
+ak980 \- configure the AJAZZ AK980 V2 keyboard
+.SH SYNOPSIS
+.B ak980
+.RI [ command ] " " [ options ]
+.br
+.B ak980-gui
+.SH DESCRIPTION
+.B ak980
+sets up the AJAZZ AK980 V2 keyboard on Linux: the clock and animations of its 1.14\(dq screen,
+the keyboard's lighting effects and per-key colours, lighting effects computed on the PC, key
+remapping on the base and Fn layers, macros, profiles and keyboard options.
+Without a command it opens the app window.
+.PP
+Settings that the keyboard stores need the USB cable. Through the 2.4 GHz dongle the keyboard
+only accepts the clock and reports its battery level.
+.SH COMMANDS
+.TP
+.B gui \fR[\fB\-\-tray\fR]
+Open the app window, optionally hidden in the tray.
+.TP
+.B status
+Connection, battery level, active profile and whether the background agent runs.
+.TP
+.B time \fR[\fB\-\-slot \fIN\fR]
+Set the screen clock to the system time.
+.TP
+.B agent \fR[\fB\-\-system\fR] [\fB\-\-once\fR] [\fB\-\-interval \fIMIN\fR]
+Run the background agent. It syncs the clock when the keyboard appears, after sleep, when the
+time or time zone changes, at midnight and periodically; streams PC lighting effects; switches
+profiles for programs; runs launcher keys. With \fB\-\-system\fR it only keeps the clock and reads
+\fI/etc/ak980/agent.conf\fR.
+.TP
+.B lcd \fIFILE\fR [\fIoptions\fR]
+Upload a GIF, an image or a folder of numbered frames to the screen (up to 140 frames).
+Options: \fB\-\-fit\fR fit|fill|stretch, \fB\-\-speed\fR, \fB\-\-delay\fR, \fB\-\-step\fR,
+\fB\-\-trim\-start\fR, \fB\-\-trim\-end\fR, \fB\-\-text\fR, \fB\-\-preview\fR \fIOUT.gif\fR,
+\fB\-\-history\fR. Every upload is also kept in \fI~/.local/share/ak980/history\fR.
+.TP
+.B effects
+List the keyboard's lighting effects and the PC effects.
+.TP
+.B light \fR[\fIEFFECT\fR] [\fB\-\-color \fIRRGGBB\fR] [\fB\-\-rainbow on|off\fR] [\fB\-\-brightness \fI0..5\fR] [\fB\-\-speed \fI0..5\fR] [\fB\-\-direction \fI0..3\fR]
+Set a lighting effect that runs in the keyboard.
+.TP
+.B fx \fR[\fIEFFECT\fR] [\fIsetting\fB=\fIvalue\fR ...] [\fB\-\-brightness \fI0..100\fR] [\fB\-\-list\fR]
+Choose a PC lighting effect (wave, drift, breath, starlight, reactive, fire, spectrum, pulse).
+The agent or the app streams it to the keyboard.
+.TP
+.B custom \fR[\fB\-\-all \fIRRGGBB\fR] [\fB\-\-key \fIKEY\fB=\fIRRGGBB\fR] [\fB\-\-wasd \fIRRGGBB\fR] [\fB\-\-clear\fR]
+Store per-key colours in the keyboard.
+.TP
+.B options \fR[\fB\-\-win\-lock\fR] [\fB\-\-alt\-tab\-lock\fR] [\fB\-\-alt\-f4\-lock\fR] [\fB\-\-fn\-toggle\fR] [\fB\-\-sleep \fI0..3\fR] [\fB\-\-response \fI1..5\fR]
+Keyboard options; each switch takes on or off.
+.TP
+.B keys
+Key names accepted by \fBremap\fR and \fBcustom\fR.
+.TP
+.B remap \fIKEY ACTION\fR [\fB\-\-fn\fR] [\fB\-\-dry\fR] | \fB\-\-reset\fR | \fB\-\-list\fR
+Remap a key. ACTION is one of: default, off, key:ctrl+shift+A, mouse:left|right|middle|double|btn4|btn5|wheelup|wheeldown,
+media:play|next|prev|volup|voldown|mute|calc|..., macro:N[:once|repeat:K|toggle|hold|click], multi:A,B,C.
+.TP
+.B macro list|add \fINAME SPEC\fB|rm \fIN\fB|clear|upload
+Manage macros. SPEC is text:\fITEXT\fR, combo:\fIctrl+alt+del\fR or steps:down:A,wait:50,up:A,click:left.
+.TP
+.B launch \fIKEY COMMAND\fR | \fB\-\-rm \fIKEY\fR | \fB\-\-list\fR
+Make one of F13\(enF24 run a program or open a link; send that key from a remapped key.
+.TP
+.B profile list|use \fINAME\fB|apply|new \fINAME\fB [\-\-copy]|rm \fINAME\fB|rename \fIOLD NEW\fB|export \fINAME FILE\fB|import \fIFILE
+Manage profiles. \fBuse\fR switches and sends the profile to the keyboard.
+.TP
+.B auto on|off|list|add \fIPROCESS PROFILE\fB|rm \fIPROCESS\fB|default \fR[\fIPROFILE\fR]
+Switch profiles automatically while a program runs.
+.TP
+.B service list|enable \fIID\fB|disable \fIID
+Start the agent automatically. IDs: session (XDG autostart), systemd-user, dinit-user,
+system-systemd, system-openrc, system-dinit, system-runit, system-s6.
+.TP
+.B setup
+Install the udev rule that lets your user access the keyboard (asks for your password).
+.TP
+.B apply
+Send the active profile and the time to the keyboard.
+.SH OPTIONS
+.TP
+.B \-\-lang \fRauto|en|uk
+Interface language.
+.TP
+.B \-\-version
+Print the version.
+.SH FILES
+.TP
+.I ~/.config/ak980/config.json
+Profiles and settings.
+.TP
+.I ~/.local/share/ak980/history/
+Copies of every animation uploaded to the screen.
+.TP
+.I /etc/ak980/agent.conf
+Settings of the system service (clock_slot, sync_interval_min).
+.TP
+.I /usr/lib/udev/rules.d/60-ajazz-ak980.rules
+Access rule for the keyboard's HID interfaces.
+.SH EXAMPLES
+.nf
+ak980 time
+ak980 lcd ~/Pictures/cat.gif \-\-fit fill
+ak980 fx spectrum palette=fire sensitivity=70
+ak980 remap CapsLock key:ctrl
+ak980 macro add "Hello" "text:Hello, world!" && ak980 remap F12 macro:0
+ak980 auto add cs2 Gaming && ak980 auto on
+ak980 service enable dinit\-user
+.fi
+.SH NOTES
+Unofficial software, not affiliated with AJAZZ. Writing to a key layer replaces the whole layer.
+The keyboard cannot give an uploaded animation back, which is why every upload is kept.
+.SH SEE ALSO
+https://github.com/yellowhearth1/ajazz\-ak980\-v2\-linux

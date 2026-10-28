@@ -1,0 +1,84 @@
+# Maintainer: yellowhearth1
+#
+# Ajazz AK980 V2 | Software for Linux
+# Split package in the Artix style: the main package carries the systemd units and the
+# XDG autostart entry; -openrc, -dinit, -runit and -s6 add the service for that init system.
+
+pkgbase=ajazz-ak980-v2-linux
+pkgname=(ajazz-ak980-v2-linux
+         ajazz-ak980-v2-linux-openrc
+         ajazz-ak980-v2-linux-dinit
+         ajazz-ak980-v2-linux-runit
+         ajazz-ak980-v2-linux-s6)
+pkgver=0.0.1
+pkgrel=1
+pkgdesc="Ajazz AK980 V2 | Software for Linux: screen clock and GIFs, lighting, PC lighting effects, keys, macros, profiles"
+arch=(any)
+url="https://github.com/yellowhearth1/ajazz-ak980-v2-linux"
+license=(MIT)
+makedepends=(python-build python-installer python-setuptools python-wheel)
+checkdepends=(python-pytest python-pyqt6 python-pillow python-numpy qt6-svg)
+source=("$pkgbase-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
+# Run updpkgsums after tagging a release; the tarball GitHub serves is the one that counts.
+sha256sums=('SKIP')
+
+build() {
+  cd "$pkgbase-$pkgver"
+  python -m build --wheel --no-isolation
+}
+
+check() {
+  cd "$pkgbase-$pkgver"
+  QT_QPA_PLATFORM=offscreen python -m pytest -q
+}
+
+package_ajazz-ak980-v2-linux() {
+  depends=(python python-pyqt6 python-pillow python-numpy qt6-svg ttf-fira-sans ttf-fira-mono)
+  optdepends=('libpulse: music lighting effects through parec'
+              'pipewire: music lighting effects through pw-record'
+              'polkit: allow keyboard access and system services from the app'
+              'qt6-wayland: native Wayland window')
+  backup=(etc/ak980/agent.conf)
+  install=ajazz-ak980-v2-linux.install
+
+  cd "$pkgbase-$pkgver"
+  python -m installer --destdir="$pkgdir" dist/*.whl
+  make DESTDIR="$pkgdir" PREFIX=/usr install-data install-systemd
+
+  # Fira comes from ttf-fira-sans and ttf-fira-mono; the bundled copy is for the AppImage
+  local site
+  site=$(python -c "import site; print(site.getsitepackages()[0])")
+  rm -r "$pkgdir$site/ak980/data/fonts"
+
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
+  install -Dm644 docs/PROTOCOL.md "$pkgdir/usr/share/doc/$pkgname/PROTOCOL.md"
+}
+
+package_ajazz-ak980-v2-linux-openrc() {
+  pkgdesc="OpenRC service for Ajazz AK980 V2 | Software for Linux (screen clock)"
+  depends=(ajazz-ak980-v2-linux openrc)
+  cd "$pkgbase-$pkgver"
+  make DESTDIR="$pkgdir" PREFIX=/usr install-openrc
+}
+
+package_ajazz-ak980-v2-linux-dinit() {
+  pkgdesc="dinit services for Ajazz AK980 V2 | Software for Linux (system clock service and user agent)"
+  depends=(ajazz-ak980-v2-linux dinit)
+  cd "$pkgbase-$pkgver"
+  make DESTDIR="$pkgdir" PREFIX=/usr install-dinit
+}
+
+package_ajazz-ak980-v2-linux-runit() {
+  pkgdesc="runit service for Ajazz AK980 V2 | Software for Linux (screen clock)"
+  depends=(ajazz-ak980-v2-linux runit)
+  cd "$pkgbase-$pkgver"
+  make DESTDIR="$pkgdir" PREFIX=/usr RUNITDIR=/etc/runit/sv install-runit
+}
+
+package_ajazz-ak980-v2-linux-s6() {
+  pkgdesc="s6 service for Ajazz AK980 V2 | Software for Linux (screen clock)"
+  depends=(ajazz-ak980-v2-linux s6)
+  cd "$pkgbase-$pkgver"
+  make DESTDIR="$pkgdir" PREFIX=/usr S6DIR=/etc/s6/sv install-s6
+}

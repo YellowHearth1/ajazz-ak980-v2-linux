@@ -1,0 +1,10 @@
+#!/bin/sh
+# Ajazz AK980 V2 AppImage entry point: no arguments opens the window, anything else goes to the CLI.
+HERE="$(dirname "$(readlink -f "$0")")"
+export PYTHONNOUSERSITE=1
+export PYTHONDONTWRITEBYTECODE=1
+PY="$(ls "$HERE"/opt/python3*/bin/python3.* 2>/dev/null | grep -v config | head -n 1)"
+if [ "$#" -eq 0 ]; then
+    exec "$PY" -m ak980 gui
+fi
+exec "$PY" -m ak980 "$@"

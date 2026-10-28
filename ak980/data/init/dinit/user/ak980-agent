@@ -1,0 +1,7 @@
+# Ajazz AK980 V2 agent, user service: screen clock, PC lighting effects,
+# profile switching and launcher keys.
+#   dinitctl --user enable ak980-agent
+type     = process
+command  = @AK980@ agent
+restart  = true
+log-type = buffer

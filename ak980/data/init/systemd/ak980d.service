@@ -1,0 +1,23 @@
+# Ajazz AK980 V2 clock service, system-wide: keeps the keyboard's screen clock
+# in sync even without a desktop session. The per-user agent does more.
+#   systemctl enable --now ak980d.service
+[Unit]
+Description=Ajazz AK980 V2 screen clock sync
+Documentation=https://github.com/yellowhearth1/ajazz-ak980-v2-linux
+After=systemd-udevd.service time-sync.target
+
+[Service]
+Type=simple
+ExecStart=@AK980@ agent --system
+Restart=on-failure
+RestartSec=5
+DynamicUser=yes
+SupplementaryGroups=input
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+NoNewPrivileges=yes
+RestrictAddressFamilies=AF_UNIX
+
+[Install]
+WantedBy=multi-user.target

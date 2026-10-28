@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.yellowhearth1.AjazzAK980V2</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <name>Ajazz AK980 V2</name>
+  <summary>Configure the AJAZZ AK980 V2 keyboard on Linux</summary>
+  <summary xml:lang="uk">Налаштування клавіатури AJAZZ AK980 V2 у Linux</summary>
+  <developer id="io.github.yellowhearth1">
+    <name>yellowhearth1</name>
+  </developer>
+  <description>
+    <p>
+      Unofficial replacement for the vendor's Windows-only driver. It keeps the keyboard's screen
+      clock in sync with your system, uploads GIFs and pictures to the 1.14" screen, sets the
+      keyboard's lighting effects and per-key colours, streams lighting effects computed on the PC
+      (music spectrum, reactive typing, fire and more), remaps keys on both layers, records macros
+      and switches profiles when a game starts.
+    </p>
+    <p xml:lang="uk">
+      Неофіційна заміна драйвера, що існує лише для Windows. Синхронізує годинник на екрані
+      клавіатури з системою, завантажує GIF і зображення на екран 1.14", керує ефектами підсвітки
+      та кольорами клавіш, транслює ефекти, які рахує комп'ютер (спектр музики, відгук на набір,
+      вогонь тощо), перепризначає клавіші на обох шарах, записує макроси та перемикає профілі,
+      коли запускається гра.
+    </p>
+  </description>
+  <launchable type="desktop-id">io.github.yellowhearth1.AjazzAK980V2.desktop</launchable>
+  <url type="homepage">https://github.com/yellowhearth1/ajazz-ak980-v2-linux</url>
+  <url type="bugtracker">https://github.com/yellowhearth1/ajazz-ak980-v2-linux/issues</url>
+  <screenshots>
+    <screenshot type="default">
+      <caption>Lighting effects with an exact preview on the keyboard</caption>
+      <image>https://raw.githubusercontent.com/yellowhearth1/ajazz-ak980-v2-linux/main/docs/screenshots/lighting.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>A GIF on the keyboard's screen</caption>
+      <image>https://raw.githubusercontent.com/yellowhearth1/ajazz-ak980-v2-linux/main/docs/screenshots/screen.png</image>
+    </screenshot>
+  </screenshots>
+  <provides>
+    <modalias>usb:v0C45p8009*</modalias>
+    <modalias>usb:v0C45pFEFE*</modalias>
+    <binary>ak980</binary>
+  </provides>
+  <categories>
+    <category>Settings</category>
+    <category>HardwareSettings</category>
+  </categories>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="0.0.1" date="2026-10-28">
+      <description>
+        <p>First public release.</p>
+      </description>
+    </release>
+  </releases>
+</component>

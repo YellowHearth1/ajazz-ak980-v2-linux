@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Ajazz AK980 V2 agent
+Comment=Keeps the AK980 screen clock in sync and runs PC lighting effects
+Exec=@AK980@ agent
+Icon=io.github.yellowhearth1.AjazzAK980V2
+NoDisplay=true
+Terminal=false
+X-GNOME-Autostart-enabled=true
+X-KDE-autostart-phase=2

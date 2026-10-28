@@ -1,0 +1,8 @@
+# Ajazz AK980 V2 clock service, system-wide: keeps the keyboard's screen clock
+# in sync even without a desktop session.
+#   dinitctl enable ak980d
+type            = process
+command         = @AK980@ agent --system
+restart         = true
+smooth-recovery = true
+log-type        = buffer

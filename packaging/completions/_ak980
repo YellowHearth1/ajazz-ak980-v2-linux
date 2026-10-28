@@ -1,0 +1,63 @@
+#compdef ak980
+
+_ak980() {
+    local -a commands
+    commands=(
+        'gui:open the app window'
+        'status:connection, battery, profile, agent'
+        'list:the keyboard'"'"'s HID interfaces'
+        'time:sync the screen clock with the system time'
+        'agent:background agent: clock, PC effects, profiles, launcher keys'
+        'lcd:upload a GIF, an image or a folder of frames to the screen'
+        'effects:list keyboard and PC lighting effects'
+        'light:keyboard lighting effect'
+        'fx:PC lighting effect'
+        'side:side light'
+        'custom:per-key colours stored in the keyboard'
+        'options:Win/Alt+Tab/Alt+F4 locks, Fn, sleep, key response'
+        'keys:key names for remap and custom'
+        'remap:remap a key'
+        'macro:macros'
+        'launch:launcher keys F13-F24'
+        'profile:profiles'
+        'auto:switch profiles when a program starts'
+        'service:start the agent automatically'
+        'setup:let your user access the keyboard'
+        'apply:send the active profile and the time to the keyboard'
+    )
+
+    _arguments -C \
+        '--lang[interface language]:language:(auto en uk)' \
+        '--version[print the version]' \
+        '1:command:->command' \
+        '*::argument:->args'
+
+    case $state in
+        command)
+            _describe -t commands 'ak980 command' commands
+            ;;
+        args)
+            case $words[1] in
+                lcd)
+                    _arguments '--fit:mode:(fit fill stretch)' '--preview:output:_files' '--history' \
+                        '--text:text:' '--speed:speed:' '--delay:ms:' '--step:n:' '*:file:_files -g "*.(gif|png|jpg|jpeg|bmp|webp)"'
+                    ;;
+                fx) _values 'effect' wave drift breath starlight reactive fire spectrum pulse ;;
+                macro) _values 'action' list add rm clear upload ;;
+                profile) _values 'action' list use apply new rm rename export import ;;
+                auto) _values 'action' on off list add rm default ;;
+                service)
+                    if (( CURRENT == 2 )); then
+                        _values 'action' list enable disable
+                    else
+                        _values 'method' session systemd-user dinit-user system-systemd system-openrc system-dinit system-runit system-s6
+                    fi
+                    ;;
+                remap|custom) _values 'key' ${(f)"$(ak980 keys 2>/dev/null | awk '{print $2}')"} ;;
+                agent|daemon) _arguments '--system' '--once' '--interval:minutes:' ;;
+            esac
+            ;;
+    esac
+}
+
+_ak980 "$@"

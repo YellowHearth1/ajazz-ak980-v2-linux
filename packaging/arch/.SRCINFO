@@ -1,0 +1,53 @@
+pkgbase = ajazz-ak980-v2-linux
+	pkgdesc = Ajazz AK980 V2 | Software for Linux: screen clock and GIFs, lighting, PC lighting effects, keys, macros, profiles
+	pkgver = 0.0.1
+	pkgrel = 1
+	url = https://github.com/yellowhearth1/ajazz-ak980-v2-linux
+	arch = any
+	license = MIT
+	checkdepends = python-pytest
+	checkdepends = python-pyqt6
+	checkdepends = python-pillow
+	checkdepends = python-numpy
+	checkdepends = qt6-svg
+	makedepends = python-build
+	makedepends = python-installer
+	makedepends = python-setuptools
+	makedepends = python-wheel
+	source = ajazz-ak980-v2-linux-0.0.1.tar.gz::https://github.com/yellowhearth1/ajazz-ak980-v2-linux/archive/refs/tags/v0.0.1.tar.gz
+	sha256sums = SKIP
+
+pkgname = ajazz-ak980-v2-linux
+	install = ajazz-ak980-v2-linux.install
+	depends = python
+	depends = python-pyqt6
+	depends = python-pillow
+	depends = python-numpy
+	depends = qt6-svg
+	depends = ttf-fira-sans
+	depends = ttf-fira-mono
+	optdepends = libpulse: music lighting effects through parec
+	optdepends = pipewire: music lighting effects through pw-record
+	optdepends = polkit: allow keyboard access and system services from the app
+	optdepends = qt6-wayland: native Wayland window
+	backup = etc/ak980/agent.conf
+
+pkgname = ajazz-ak980-v2-linux-openrc
+	pkgdesc = OpenRC service for Ajazz AK980 V2 | Software for Linux (screen clock)
+	depends = ajazz-ak980-v2-linux
+	depends = openrc
+
+pkgname = ajazz-ak980-v2-linux-dinit
+	pkgdesc = dinit services for Ajazz AK980 V2 | Software for Linux (system clock service and user agent)
+	depends = ajazz-ak980-v2-linux
+	depends = dinit
+
+pkgname = ajazz-ak980-v2-linux-runit
+	pkgdesc = runit service for Ajazz AK980 V2 | Software for Linux (screen clock)
+	depends = ajazz-ak980-v2-linux
+	depends = runit
+
+pkgname = ajazz-ak980-v2-linux-s6
+	pkgdesc = s6 service for Ajazz AK980 V2 | Software for Linux (screen clock)
+	depends = ajazz-ak980-v2-linux
+	depends = s6

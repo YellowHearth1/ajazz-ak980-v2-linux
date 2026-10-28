@@ -1,0 +1,16 @@
+# Ajazz AK980 V2 agent, user service: screen clock, PC lighting effects,
+# profile switching and launcher keys.
+#   systemctl --user enable --now ak980-agent.service
+[Unit]
+Description=Ajazz AK980 V2 agent (screen clock, lighting effects, profiles)
+Documentation=https://github.com/yellowhearth1/ajazz-ak980-v2-linux
+After=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=@AK980@ agent
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,3 @@
+#!/bin/sh
+# Ajazz AK980 V2 clock service (s6): keeps the keyboard's screen clock in sync.
+exec @AK980@ agent --system 2>&1

@@ -1,0 +1,15 @@
+#!/sbin/openrc-run
+# Ajazz AK980 V2 clock service: keeps the keyboard's screen clock in sync.
+#   rc-update add ak980d default && rc-service ak980d start
+
+name="ak980d"
+description="Ajazz AK980 V2 screen clock sync"
+command="@AK980@"
+command_args="agent --system"
+command_user="nobody:input"
+command_background=true
+pidfile="/run/${RC_SVCNAME}.pid"
+
+depend() {
+	after udev ntpd chronyd
+}

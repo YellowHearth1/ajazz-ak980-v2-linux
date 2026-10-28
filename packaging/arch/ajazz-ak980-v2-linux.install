@@ -1,0 +1,22 @@
+post_install() {
+  udevadm control --reload-rules 2>/dev/null
+  udevadm trigger --action=add --subsystem-match=hidraw 2>/dev/null
+  cat <<'MSG'
+==> Ajazz AK980 V2: reconnect the keyboard if it was plugged in.
+==> The background agent starts with your desktop session. To start it as a service instead:
+      systemd:  systemctl --user enable --now ak980-agent.service
+      dinit:    dinitctl --user enable ak980-agent     (package ajazz-ak980-v2-linux-dinit)
+    Clock only, system-wide (before login too):
+      systemd:  systemctl enable --now ak980d.service
+      OpenRC:   rc-update add ak980d default && rc-service ak980d start
+      dinit:    dinitctl enable ak980d
+      runit:    ln -s /etc/runit/sv/ak980d /run/runit/service/
+      s6:       s6-service add default ak980d-srv && s6-db-reload
+    Or pick one on the app's Device page.
+MSG
+}
+
+post_upgrade() {
+  udevadm control --reload-rules 2>/dev/null
+  udevadm trigger --action=add --subsystem-match=hidraw 2>/dev/null
+}
