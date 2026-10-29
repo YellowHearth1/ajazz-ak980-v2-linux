@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.0.2 — unreleased
+
+- 2.4 GHz: the agent keeps the receiver's two vendor interfaces open, so that Linux polls them the
+  way Windows and macOS do. Receivers of this kind can stop answering when a report waits unread
+  there, which matches keys that stop arriving mid-typing until the cable goes in.
+- 2.4 GHz: the agent asks the keyboard for its battery once a minute and records every change of the
+  link in `~/.local/state/ak980/link.log`, so a dropout shows whether the receiver, the radio link or
+  the PC failed.
+- Security: the udev rule opens only the interfaces the app uses (screen and commands on the cable,
+  3 and 4 on the receiver). It used to open the keystroke interfaces too, which let any program of
+  the user read raw key presses past the Wayland compositor. Installing the rule from the app also
+  closes them on a keyboard that is already plugged in.
+
 ## 0.0.1 — 2026-10-29
 
 First public release.

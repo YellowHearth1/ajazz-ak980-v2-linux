@@ -1,5 +1,14 @@
-# Ajazz AK980 V2: lets the logged-in user (and the "input" group) use the keyboard's
-# configuration interfaces without root. 0c45:8009 is the USB cable, 0c45:fefe the 2.4 GHz dongle.
-# Installed by ajazz-ak980-v2-linux (https://github.com/yellowhearth1/ajazz-ak980-v2-linux).
-SUBSYSTEM=="hidraw", ATTRS{idVendor}=="0c45", ATTRS{idProduct}=="8009", MODE="0660", GROUP="input", TAG+="uaccess"
-SUBSYSTEM=="hidraw", ATTRS{idVendor}=="0c45", ATTRS{idProduct}=="fefe", MODE="0660", GROUP="input", TAG+="uaccess"
+# Ajazz AK980 V2: lets the logged-in user (and the "input" group) use the interfaces this app talks
+# to, and only those. The keyboard's other interfaces carry what is typed: opening them to the user
+# would let any program read every keystroke. 0c45:8009 is the USB cable, 0c45:fefe the 2.4 GHz
+# dongle. Installed by ajazz-ak980-v2-linux (https://github.com/yellowhearth1/ajazz-ak980-v2-linux).
+SUBSYSTEM!="hidraw", GOTO="ajazz_ak980_end"
+# The interface number sits on the USB interface, the IDs on its USB device; one rule cannot test both
+ATTRS{idVendor}=="0c45", ATTRS{idProduct}=="8009", ENV{.AJAZZ_AK980}="usb"
+ATTRS{idVendor}=="0c45", ATTRS{idProduct}=="fefe", ENV{.AJAZZ_AK980}="dongle"
+# Cable: interface 2 takes the screen (usage page 0xFF68), interface 3 every command (0xFF13)
+ENV{.AJAZZ_AK980}=="usb", ATTRS{bInterfaceNumber}=="02|03", MODE="0660", GROUP="input", TAG+="uaccess"
+# Dongle: interface 3 takes the battery and clock commands (0xFF60); interface 4 (0xFF59) is only
+# kept open by the agent, so that Linux polls it like Windows and macOS do
+ENV{.AJAZZ_AK980}=="dongle", ATTRS{bInterfaceNumber}=="03|04", MODE="0660", GROUP="input", TAG+="uaccess"
+LABEL="ajazz_ak980_end"

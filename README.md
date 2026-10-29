@@ -147,13 +147,23 @@ with pipewire-pulse) or `pw-record`. Install one of them.
 **Reactive effects ignore typing.** Reading key presses needs the `input` group:
 `sudo usermod -aG input $USER`, then log in again. Clicking keys in the app still works.
 
-**Keys stop arriving over 2.4 GHz.** The radio link between the keyboard and its receiver is run by
-their firmware; Linux only reads the receiver over USB. Most dropouts come from a receiver behind the
-metal PC case: put it on a USB extension cable or a front port near the keyboard, away from Wi-Fi
-routers and USB 3 devices. Tools like `powertop --auto-tune` can suspend the receiver; exclude it.
-If it still happens, run `ak980 status` from another keyboard or over SSH before reaching for the
-cable. If the battery is still shown, the keyboard reaches the receiver and the problem is on the PC
-side: please open an issue with that output and the end of `dmesg`.
+**Keys stop arriving over 2.4 GHz.** Besides the keyboard, the receiver has two vendor interfaces.
+Windows and macOS read them all the time; Linux reads an interface only while a program has it open.
+Receivers like this one can stop answering on every interface when a report waits unread there, and
+the same receiver (`0c45:fefe`) is reported to drop under Linux but not under macOS. The agent keeps
+both interfaces open while the receiver is plugged in, so keep it running. The kernel can do the same
+on its own: add `usbhid.quirks=0x0c45:0xfefe:0x400` (`HID_QUIRK_ALWAYS_POLL`) to the kernel command
+line.
+
+The agent also records the link in `~/.local/state/ak980/link.log`: once a minute it asks the
+keyboard for its battery over 2.4 GHz and writes down every change, and when you switch to the
+cable. After a dropout the last lines tell what failed: *did not take the request* means the
+receiver stopped answering the PC, *did not answer* means the radio link, and no change at all means
+the keyboard was still reachable. Please open an issue with that file and the end of `dmesg`.
+
+Placement matters too: a receiver behind the metal case or next to Wi-Fi gear loses the keyboard.
+Put it on a USB extension cable or a front port, and not on the same USB 2.0 hub as an audio
+interface or USB microphone. Tools like `powertop --auto-tune` can suspend the receiver; exclude it.
 
 **The screen jumped to another page after a clock sync.** The vendor app sends a screen page with the
 time; this app sends page 1 like it does. Change it on the *Device* page if your screen uses another.

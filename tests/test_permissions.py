@@ -10,10 +10,26 @@ def test_trigger_targets_only_the_keyboard():
                    "--sysname-match=hidraw0 --sysname-match=hidraw7\n")
 
 
+def test_revoke_only_the_keystroke_nodes():
+    assert permissions.revoke_command(["/dev/hidraw3"], ["/dev/hidraw3"]) == ""
+    cmd = permissions.revoke_command(["/dev/hidraw7", "/dev/hidraw10"], ["/dev/hidraw10"])
+    assert "chmod 0600 /dev/hidraw7\n" in cmd and cmd.endswith("setfacl -b /dev/hidraw7; fi\n")
+    assert "hidraw10" not in cmd
+
+
+def test_rule_opens_only_the_vendor_interfaces():
+    with open(permissions.RULE_SOURCE, encoding="utf-8") as f:
+        rules = [line for line in f if "uaccess" in line and not line.startswith("#")]
+    assert len(rules) == 2
+    assert 'ENV{.AJAZZ_AK980}=="usb", ATTRS{bInterfaceNumber}=="02|03"' in rules[0]
+    assert 'ENV{.AJAZZ_AK980}=="dongle", ATTRS{bInterfaceNumber}=="03|04"' in rules[1]
+
+
 def test_install_rule(monkeypatch, tmp_path):
     scripts = []
     monkeypatch.setattr(permissions, "run_as_root", scripts.append)      # never asks for a password
     monkeypatch.setattr(permissions, "keyboard_nodes", lambda: ["/dev/hidraw3"])
+    monkeypatch.setattr(permissions, "app_nodes", lambda: ["/dev/hidraw3"])
     packaged = tmp_path / "usr" / permissions.RULE_NAME
     monkeypatch.setattr(permissions, "RULE_LOCATIONS", (str(packaged), "/etc/udev/rules.d/" + permissions.RULE_NAME))
 

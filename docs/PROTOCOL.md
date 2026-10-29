@@ -150,8 +150,10 @@ multiple of 64; the last two bytes are `AA 55`. The vendor driver refuses more t
 ## Dongle commands
 
 33-byte output reports: report ID 0, the command, and the byte sum of everything before it in the
-last byte. The reply repeats the first three command bytes. The keyboard only answers while it is in
-2.4 GHz mode; after a while idle the first request just wakes the radio link.
+last byte. The reply repeats the first three command bytes and ends with its own byte sum (battery:
+`20 01 00 64 … 85`); one request can bring two identical replies a few milliseconds apart. The
+keyboard only answers while it is in 2.4 GHz mode; after a while idle the first request just wakes
+the radio link.
 
 | Command | Reply | Meaning |
 |---|---|---|
@@ -163,9 +165,14 @@ over the dongle; the app does not implement it because the chunk layout is not s
 
 The dongle (`0c45:fefe`) has five HID interfaces: 0 keyboard, 1 mouse, 2 consumer, system and NKRO
 keyboard, 3 vendor page `FF60` (the commands above) and 4 vendor page `FF59` (65-byte reports, unused).
-Linux reads interfaces 3 and 4 only while a program has their hidraw node open. With both opened and
-nothing sent, the dongle delivered no reports in 20 s and nothing was waiting, so it does not stall
-when the host leaves those endpoints unread (some receivers do and need `HID_QUIRK_ALWAYS_POLL`).
+Linux reads interfaces 3 and 4 only while a program has their hidraw node open; Windows and macOS
+always do. Some receivers with a vendor interface stop answering on every interface when a report
+waits there unread (the kernel gave the Cooler Master mouse dongle `HID_QUIRK_ALWAYS_POLL` for that in
+2025), and keyboards with this dongle are reported to drop under Linux but not under macOS. The agent
+therefore keeps both nodes open while the dongle is plugged in. In 25 minutes of typing with both
+open (2026-10-29), the dongle sent nothing it was not asked for, and typing does not reach interfaces 3
+or 4. The udev rule opens interfaces 3 and 4 to the user and leaves 0–2, which carry keystrokes, to
+root.
 
 ## What has been verified
 

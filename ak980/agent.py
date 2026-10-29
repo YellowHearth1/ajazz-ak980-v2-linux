@@ -16,6 +16,7 @@ from __future__ import annotations
 import datetime as dt
 import logging
 import os
+import select
 import shlex
 import signal
 import subprocess
@@ -23,7 +24,8 @@ import threading
 import time
 
 from . import config as cfgmod
-from .device import Dongle, WiredKeyboard
+from .device import DONGLE_PID, VENDOR_ID, Dongle, WiredKeyboard
+from .hid import enumerate_hid
 from .i18n import set_language, tr
 from .keymap import key_code
 from .runtime import InstanceLock
@@ -32,6 +34,26 @@ log = logging.getLogger("ak980.agent")
 
 POLL_SECONDS = 3
 SWITCH_SECONDS = 3
+# The dongle's vendor interfaces: 3 (usage page FF60, battery and clock) and 4 (FF59)
+DONGLE_VENDOR_INTERFACES = (3, 4)
+# How often the agent asks the keyboard for its battery over 2.4 GHz; the stock software polls too
+LINK_CHECK_SECONDS = 60
+# A record of the 2.4 GHz link that outlives the service's log buffer, for chasing dropouts
+LINK_LOG = os.path.join(os.environ.get("XDG_STATE_HOME", os.path.expanduser("~/.local/state")), "ak980", "link.log")
+LINK_LOG_MAX = 256 * 1024
+
+
+def link_event(message: str) -> None:
+    """Appends a line to the link log (user agent only; keeps the last ~256 KiB)."""
+    log.info("%s", message)
+    try:
+        os.makedirs(os.path.dirname(LINK_LOG), exist_ok=True)
+        if os.path.exists(LINK_LOG) and os.path.getsize(LINK_LOG) > LINK_LOG_MAX:
+            os.replace(LINK_LOG, LINK_LOG + ".1")
+        with open(LINK_LOG, "a", encoding="utf-8") as f:
+            f.write(f"{dt.datetime.now().isoformat(sep=' ', timespec='seconds')} {message}\n")
+    except OSError:
+        pass
 
 
 def _tz_key() -> tuple:
@@ -86,6 +108,74 @@ def matching_profile(settings: cfgmod.Settings, names: set[str]) -> str | None:
     return None
 
 
+class DonglePoller(threading.Thread):
+    """Keeps the dongle's vendor interfaces open, so that Linux keeps polling them.
+
+    Linux reads a HID interface's interrupt endpoint only while a program has it open; Windows and
+    macOS always do. Wireless receivers with a vendor interface next to the keyboard can stop
+    answering on every interface once a report waits unread there (the kernel fixes that per device
+    with HID_QUIRK_ALWAYS_POLL; the Cooler Master dongle got it in 2025). The same dongle as the
+    AK980's (0c45:fefe) loses its keyboard under Linux but not under macOS. Nothing is sent; any
+    report the dongle sends without being asked is logged, because it shows what wakes it up.
+    """
+
+    def __init__(self, record: bool = False) -> None:
+        super().__init__(name="ak980-dongle-poller", daemon=True)
+        self._stop = threading.Event()
+        self._fds: dict[int, str] = {}
+        self._record = record          # write unsolicited reports to the link log
+
+    def stop(self) -> None:
+        self._stop.set()
+
+    def _rescan(self) -> None:
+        open_paths = set(self._fds.values())
+        for info in enumerate_hid(VENDOR_ID, DONGLE_PID):
+            if info.interface not in DONGLE_VENDOR_INTERFACES or info.path in open_paths:
+                continue
+            try:
+                fd = os.open(info.path, os.O_RDONLY | os.O_NONBLOCK | os.O_CLOEXEC)
+            except OSError as e:
+                log.warning("cannot keep %s (dongle interface %d) open: %s", info.path, info.interface, e)
+                continue
+            self._fds[fd] = info.path
+            log.info("keeping %s (dongle interface %d) polled", info.path, info.interface)
+
+    def _close(self, fd: int) -> None:
+        log.info("dongle interface %s closed", self._fds.pop(fd))
+        os.close(fd)
+
+    def run(self) -> None:
+        rescan_at = 0.0
+        try:
+            while not self._stop.is_set():
+                if time.monotonic() >= rescan_at:
+                    rescan_at = time.monotonic() + POLL_SECONDS
+                    self._rescan()
+                if not self._fds:
+                    self._stop.wait(POLL_SECONDS)
+                    continue
+                ready, _, _ = select.select(list(self._fds), [], [], POLL_SECONDS)
+                for fd in ready:
+                    try:
+                        data = os.read(fd, 128)
+                    except BlockingIOError:
+                        continue
+                    except OSError:
+                        self._close(fd)      # unplugged
+                        continue
+                    # Replies to the battery (20) and clock (0C) requests reach every open node
+                    if data[:1] in (b"\x20", b"\x0c"):
+                        log.debug("dongle %s sent %s", self._fds[fd], data.hex(" "))
+                    elif self._record:
+                        link_event(f"dongle {self._fds[fd]} sent {data.hex(' ')}")
+                    else:
+                        log.info("dongle %s sent %s", self._fds[fd], data.hex(" "))
+        finally:
+            for fd in list(self._fds):
+                self._close(fd)
+
+
 def run_launcher(command: str) -> None:
     cmd = command.strip()
     if not cmd:
@@ -109,6 +199,7 @@ class Agent:
         self._stop = threading.Event()
         self.engine = None
         self.keys = None
+        self.poller: DonglePoller | None = None
         self._launchers: dict[int, str] = {}
         self._wanted: str | None = None          # profile the running programs asked for last time
         self._for_program: str | None = None     # profile switched to because a program runs
@@ -187,6 +278,32 @@ class Agent:
         if pressed and usage in self._launchers:
             run_launcher(self._launchers[usage])
 
+    # ------------------------------------------------------------ 2.4 GHz link
+
+    def _check_link(self, last: str | None) -> str:
+        """Asks for the battery and records when the kind of answer changes.
+
+        Three ways a dropout can look: the write itself fails (the dongle stopped answering USB),
+        the dongle takes the request but the keyboard stays silent (the radio link), or the
+        keyboard keeps answering while keys do not arrive (the PC side).
+        """
+        level = error = None
+        info = Dongle.find()
+        if info is not None:
+            try:
+                with Dongle(info) as d:
+                    level = d.read_battery()
+            except OSError as e:
+                error = e
+        state = "answers" if level is not None else "unsent" if error else "silent"
+        if state != last:
+            link_event({
+                "answers": f"2.4 GHz: the keyboard answers, battery {level}%",
+                "silent": "2.4 GHz: the dongle took the request, the keyboard did not answer",
+                "unsent": f"2.4 GHz: the dongle did not take the request ({error})",
+            }[state])
+        return state
+
     # ------------------------------------------------------------ main loop
 
     def stop(self, *_) -> None:
@@ -210,6 +327,9 @@ class Agent:
             set_language(cfgmod.peek_language())
         cfg = self._load()
         seen = cfgmod.mtime() if cfg is not None else 0.0
+        if not once:
+            self.poller = DonglePoller(record=not self.system)
+            self.poller.start()
         if cfg is not None and not once:
             from .engine import LightingEngine
             self.engine = LightingEngine(drive_device=True)
@@ -217,6 +337,8 @@ class Agent:
             self._update_launchers(cfg)
 
         present = None
+        link_state: str | None = None     # how the keyboard answered over 2.4 GHz last time
+        next_link_check = 0.0
         last_sync = 0.0
         retry_at = 0.0
         wall_ref = time.time() - time.monotonic()
@@ -251,7 +373,15 @@ class Agent:
                         reason = "periodic"
                     elif retry_at and time.monotonic() >= retry_at:
                         reason = "retry"
+                if now_present != present and not once and not self.system:
+                    link_event(f"keyboard: {present or 'not connected'} -> {now_present or 'not connected'}")
+                    link_state = None
+                    next_link_check = time.monotonic() + 5     # the radio link takes a moment
                 present = now_present
+
+                if now_present == "2.4g" and not once and not self.system and time.monotonic() >= next_link_check:
+                    next_link_check = time.monotonic() + LINK_CHECK_SECONDS
+                    link_state = self._check_link(link_state)
 
                 if reason and settings.clock_auto:
                     if reason.startswith("connected") and not once:
@@ -288,6 +418,8 @@ class Agent:
                 self.engine.stop()
             if self.keys:
                 self.keys.stop()
+            if self.poller:
+                self.poller.stop()
             lock.release()
         return 0
 
