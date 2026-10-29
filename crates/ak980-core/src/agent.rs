@@ -29,7 +29,7 @@ use crate::config::{self, Config, Settings};
 use crate::device::{DONGLE_PID, Dongle, VENDOR_ID, WiredKeyboard};
 use crate::engine::LightingEngine;
 use crate::hid::enumerate;
-use crate::i18n::set_language;
+use crate::i18n::{set_language, tr};
 use crate::keyinput::KeyListener;
 use crate::keymap::key_code;
 use crate::paths;
@@ -134,6 +134,66 @@ pub fn record_link(last: Option<&str>, answer: &LinkAnswer, log: &Path) -> Strin
         append_link_line(log, &message);
     }
     state.to_string()
+}
+
+// ------------------------------------------------------------ desktop notifications
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Notice {
+    pub summary: String,
+    pub body: String,
+    pub urgent: bool,
+}
+
+/// What to tell the user after a link check, if anything: the keyboard stopped answering over
+/// 2.4 GHz, or its battery got low. `alerted` remembers the last battery warning (20 or 10 %), so
+/// each one comes once per discharge; charging past 30 % clears it.
+pub fn link_notice(last: Option<&str>, now: &str, answer: &LinkAnswer, alerted: &mut Option<u8>) -> Option<Notice> {
+    if last == Some("answers") && now != "answers" {
+        return Some(Notice {
+            summary: tr("The keyboard stopped answering over 2.4 GHz"),
+            body: tr("If keys stop arriving, press Reconnect on the Device page or run `ak980 reconnect`."),
+            urgent: false,
+        });
+    }
+    let LinkAnswer::Level(level) = answer else { return None };
+    let level = *level;
+    if level >= 30 {
+        *alerted = None;
+        return None;
+    }
+    let step = if level <= 10 { 10 } else if level <= 20 { 20 } else { return None };
+    if alerted.is_some_and(|a| a <= step) {
+        return None;
+    }
+    *alerted = Some(step);
+    Some(Notice {
+        summary: tr!("Keyboard battery at {level}%", level = level),
+        body: tr("Connect the cable to charge it; it keeps working while it charges."),
+        urgent: step == 10,
+    })
+}
+
+/// Shows a notice through the desktop's notification service (`notify-send`).
+pub fn notify(n: &Notice) {
+    let Some(exe) = crate::service::which("notify-send") else {
+        warn!("cannot show a notification: notify-send is not installed");
+        return;
+    };
+    let mut cmd = Command::new(exe);
+    cmd.arg(format!("--app-name={}", crate::APP_NAME))
+        .arg(format!("--icon={}", crate::APP_ID))
+        .arg(if n.urgent { "--urgency=critical" } else { "--urgency=normal" })
+        .arg(&n.summary)
+        .arg(&n.body)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
+    match cmd.spawn() {
+        // Waited for on a thread of its own, so no zombie is left behind
+        Ok(mut child) => drop(std::thread::spawn(move || child.wait())),
+        Err(e) => warn!("cannot show a notification: {e}"),
+    }
 }
 
 // ------------------------------------------------------------ keeping the dongle polled
@@ -394,6 +454,8 @@ pub struct Agent {
     for_program: Option<String>,
     /// The profile that was active before that.
     before_program: Option<String>,
+    /// The last low-battery warning given (20 or 10 %).
+    battery_alert: Option<u8>,
 }
 
 impl Agent {
@@ -409,6 +471,7 @@ impl Agent {
             wanted: None,
             for_program: None,
             before_program: None,
+            battery_alert: None,
         }
     }
 
@@ -592,7 +655,13 @@ impl Agent {
 
             if now_present == Some("2.4g") && !once && !self.system && Instant::now() >= next_link_check {
                 next_link_check = Instant::now() + Duration::from_secs(LINK_CHECK_SECONDS);
-                link_state = Some(record_link(link_state.as_deref(), &ask_battery(), &paths::link_log()));
+                let answer = ask_battery();
+                let state = record_link(link_state.as_deref(), &answer, &paths::link_log());
+                let notice = link_notice(link_state.as_deref(), &state, &answer, &mut self.battery_alert);
+                if let Some(n) = notice.filter(|_| settings.notifications) {
+                    notify(&n);
+                }
+                link_state = Some(state);
             }
 
             if let Some(reason) = reason.as_deref().filter(|_| settings.clock_auto) {
@@ -651,6 +720,25 @@ pub fn run(system: bool, interval: Option<u32>, once: bool) -> i32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn notices_come_once_per_event() {
+        let mut alerted = None;
+        let n = |last: Option<&str>, now: &str, a: LinkAnswer, al: &mut Option<u8>| link_notice(last, now, &a, al);
+        // losing the keyboard after it answered
+        assert!(n(Some("answers"), "silent", LinkAnswer::Silent, &mut alerted).is_some());
+        assert!(n(Some("silent"), "silent", LinkAnswer::Silent, &mut alerted).is_none(), "said once");
+        assert!(n(None, "silent", LinkAnswer::Silent, &mut alerted).is_none(), "not right after a switch");
+        // the battery: 20 %, then 10 % (urgent), each once, and again after a charge
+        assert!(n(Some("answers"), "answers", LinkAnswer::Level(50), &mut alerted).is_none());
+        let low = n(Some("answers"), "answers", LinkAnswer::Level(19), &mut alerted).unwrap();
+        assert!(!low.urgent && low.summary.contains("19"));
+        assert!(n(Some("answers"), "answers", LinkAnswer::Level(18), &mut alerted).is_none());
+        assert!(n(Some("answers"), "answers", LinkAnswer::Level(9), &mut alerted).unwrap().urgent);
+        assert!(n(Some("answers"), "answers", LinkAnswer::Level(8), &mut alerted).is_none());
+        assert!(n(Some("answers"), "answers", LinkAnswer::Level(80), &mut alerted).is_none());
+        assert!(n(Some("answers"), "answers", LinkAnswer::Level(20), &mut alerted).is_some(), "after charging");
+    }
     use crate::config::{Profile, Rule};
 
     fn temp_dir(name: &str) -> std::path::PathBuf {
