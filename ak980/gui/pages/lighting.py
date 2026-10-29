@@ -66,7 +66,7 @@ def firmware_preview(s, t: float, pos: np.ndarray, has_color: bool = True) -> np
 class ParamEditor(QWidget):
     """Controls for a PC effect's settings, built from its parameter list."""
 
-    def __init__(self, effect_cls, values: dict, on_change):
+    def __init__(self, effect_cls, values: dict, on_change, extra=()):
         super().__init__()
         form = Form(self)
         self.effect = effect_cls
@@ -94,6 +94,8 @@ class ParamEditor(QWidget):
                     w.currentIndexChanged.connect(lambda _, k=prm.id, box=w: self._set(k, box.currentData()))
             self.widgets[prm.id] = w
             form.add(tr(prm.label), w)
+        for text, w in extra:       # rows kept across effects (brightness), aligned with the rest
+            form.add(text, w)
         self._dependencies()
 
     def _set(self, key, value) -> None:
@@ -246,15 +248,13 @@ class LightingPage(Page):
         holder_l.setLayout(left)
         lay.addWidget(holder_l, 6)
         right = QVBoxLayout()
+        right.setContentsMargins(0, 0, 0, 0)
         right.setSpacing(theme.S3)
         right.addWidget(heading(tr("Settings")))
         self.params_holder = QVBoxLayout()
         right.addLayout(self.params_holder)
-        bright = Form()
-        self.host_brightness = SliderRow(5, 100, 100, "%")
+        self.host_brightness = SliderRow(5, 100, 100, "%")     # lives in the effect's form
         self.host_brightness.changed.connect(self.host_brightness_changed)
-        bright.add(tr("Brightness"), self.host_brightness)
-        right.addLayout(bright)
         right.addStretch(1)
         holder_r = QWidget()
         holder_r.setLayout(right)
@@ -273,16 +273,20 @@ class LightingPage(Page):
         self.save_timer.start()
 
     def _build_params(self) -> None:
-        if self.param_editor is not None:
-            self.param_editor.setParent(None)
-            self.param_editor.deleteLater()
+        old = self.param_editor
+        if old is not None:
+            old.layout().removeWidget(self.host_brightness)
         p = self.profile
         cls = EFFECTS.get(p.host_effect) or next(iter(EFFECTS.values()))
         values = p.host_values.setdefault(cls.id, {prm.id: prm.default for prm in cls.params})
         for prm in cls.params:
             values.setdefault(prm.id, prm.default)
-        self.param_editor = ParamEditor(cls, values, self.save_timer.start)
+        self.param_editor = ParamEditor(cls, values, self.save_timer.start,
+                                        [(tr("Brightness"), self.host_brightness)])
         self.params_holder.addWidget(self.param_editor)
+        if old is not None:
+            old.setParent(None)
+            old.deleteLater()
         self.effect_about.setText(tr(cls.description))
         self._host_status()
 

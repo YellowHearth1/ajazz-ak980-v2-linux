@@ -26,16 +26,19 @@ OK = "#5BD08F"
 WARN = "#F2C14E"
 ERROR = "#FF6B5E"
 
-FONT_BODY = "Fira Sans"
-FONT_DISPLAY = "Fira Sans Condensed"
-FONT_MONO = "Fira Mono"
+FONT_BODY = "Ubuntu"
+FONT_DISPLAY = "Ubuntu"
+FONT_MONO = "Ubuntu Mono"
+# Used when the plain Ubuntu family is missing but a patched one is installed
+FALLBACK = {"Ubuntu": ["Ubuntu Nerd Font", "Ubuntu Nerd Font Propo"],
+            "Ubuntu Mono": ["UbuntuMono Nerd Font", "UbuntuMono Nerd Font Mono", "DejaVu Sans Mono"]}
 FONT_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "fonts")
 
 # Type scale (pixels)
-SIZE_BODY = 13
-SIZE_SMALL = 12
+SIZE_BODY = 14
+SIZE_SMALL = 13
 SIZE_TITLE = 22
-SIZE_HEADING = 16
+SIZE_HEADING = 17
 SIZE_FIGURE = 30
 
 # Spacing scale (pixels)
@@ -70,10 +73,18 @@ def color(hex_value: str, alpha: float = 1.0) -> QColor:
     return c
 
 
+def families(name: str) -> list[str]:
+    return [name] + FALLBACK.get(name, [])
+
+
+def css_family(name: str) -> str:
+    return ", ".join(f'"{f}"' for f in families(name)) + (", monospace" if "Mono" in name else ", sans-serif")
+
+
 def load_fonts() -> None:
-    """Uses the system's Fira when installed, the bundled copy otherwise."""
+    """Uses the system's Ubuntu fonts when installed, the bundled copy otherwise."""
     have = set(QFontDatabase.families())
-    if {FONT_BODY, FONT_DISPLAY, FONT_MONO} <= have:
+    if {FONT_BODY, FONT_MONO} <= have:
         return
     if os.path.isdir(FONT_DIR):
         for name in sorted(os.listdir(FONT_DIR)):
@@ -86,13 +97,14 @@ def font(role: str = "body", size: int | None = None, weight: QFont.Weight | Non
         "body": (FONT_BODY, SIZE_BODY, QFont.Weight.Normal),
         "small": (FONT_BODY, SIZE_SMALL, QFont.Weight.Normal),
         "label": (FONT_BODY, SIZE_SMALL, QFont.Weight.Medium),
-        "title": (FONT_DISPLAY, SIZE_TITLE, QFont.Weight.DemiBold),
-        "heading": (FONT_DISPLAY, SIZE_HEADING, QFont.Weight.DemiBold),
-        "figure": (FONT_DISPLAY, SIZE_FIGURE, QFont.Weight.DemiBold),
-        "mono": (FONT_MONO, SIZE_SMALL, QFont.Weight.Normal),
+        "title": (FONT_DISPLAY, SIZE_TITLE, QFont.Weight.Bold),
+        "heading": (FONT_DISPLAY, SIZE_HEADING, QFont.Weight.Medium),
+        "figure": (FONT_DISPLAY, SIZE_FIGURE, QFont.Weight.Bold),
+        "mono": (FONT_MONO, SIZE_BODY, QFont.Weight.Normal),
         "legend": (FONT_BODY, 11, QFont.Weight.Medium),
     }[role]
-    f = QFont(family)
+    f = QFont()
+    f.setFamilies(families(family))
     f.setPixelSize(size or default_size)
     f.setWeight(weight or default_weight)
     f.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
@@ -105,7 +117,7 @@ def stylesheet() -> str:
 * {{ outline: none; }}
 QWidget {{
     color: {INK};
-    font-family: "{FONT_BODY}";
+    font-family: {css_family(FONT_BODY)};
     font-size: {SIZE_BODY}px;
     selection-background-color: {AMBER};
     selection-color: {ON_AMBER};
@@ -119,9 +131,9 @@ QToolTip {{
 }}
 QLabel[role="dim"] {{ color: {INK_DIM}; }}
 QLabel[role="label"] {{ color: {INK_DIM}; font-size: {SIZE_SMALL}px; font-weight: 500; }}
-QLabel[role="heading"] {{ font-family: "{FONT_DISPLAY}"; font-size: {SIZE_HEADING}px; font-weight: 600; }}
-QLabel[role="title"] {{ font-family: "{FONT_DISPLAY}"; font-size: {SIZE_TITLE}px; font-weight: 600; }}
-QLabel[role="mono"] {{ font-family: "{FONT_MONO}"; font-size: {SIZE_SMALL}px; color: {INK_DIM}; }}
+QLabel[role="heading"] {{ font-family: {css_family(FONT_DISPLAY)}; font-size: {SIZE_HEADING}px; font-weight: 500; }}
+QLabel[role="title"] {{ font-family: {css_family(FONT_DISPLAY)}; font-size: {SIZE_TITLE}px; font-weight: 700; }}
+QLabel[role="mono"] {{ font-family: {css_family(FONT_MONO)}; font-size: {SIZE_BODY}px; color: {INK_DIM}; }}
 QLabel[role="warn"] {{ color: {WARN}; }}
 QLabel[role="error"] {{ color: {ERROR}; }}
 QLabel:disabled {{ color: {INK_OFF}; }}
@@ -145,27 +157,17 @@ QPushButton[kind="primary"]:hover {{ background: {AMBER_HI}; }}
 QPushButton[kind="primary"]:pressed {{ background: {AMBER_LO}; }}
 QPushButton[kind="primary"]:focus {{ border-color: {INK}; }}
 QPushButton[kind="primary"]:disabled {{ background: #5A4128; color: #2A2116; border-color: #5A4128; }}
-QPushButton[kind="ghost"] {{ background: transparent; border-color: transparent; color: {INK_DIM}; padding: 6px 10px; }}
+QPushButton[kind="ghost"], QPushButton[kind="danger"] {{ background: transparent; border-color: transparent;
+    color: {INK_DIM}; padding: 6px 10px; }}
 QPushButton[kind="ghost"]:hover {{ background: {KEYCAP}; color: {INK}; }}
-QPushButton[kind="ghost"]:focus {{ border-color: {AMBER}; }}
-QPushButton[kind="danger"]:hover {{ color: {ERROR}; border-color: {ERROR}; }}
+QPushButton[kind="danger"]:hover {{ background: {KEYCAP}; color: {ERROR}; }}
+QPushButton[kind="ghost"]:focus, QPushButton[kind="danger"]:focus {{ border-color: {AMBER}; }}
 
 QPushButton[segment] {{ border-radius: 0; padding: 6px 12px; margin: 0; }}
 QPushButton[segment="first"] {{ border-top-left-radius: 6px; border-bottom-left-radius: 6px; }}
 QPushButton[segment="last"] {{ border-top-right-radius: 6px; border-bottom-right-radius: 6px; }}
 QPushButton[segment="only"] {{ border-radius: 6px; }}
 QPushButton[segment]:checked {{ background: {AMBER}; color: {ON_AMBER}; border-color: {AMBER_LO}; font-weight: 600; }}
-
-QPushButton[keycap="true"] {{
-    background: {KEYCAP}; border: 1px solid #23252B; border-bottom: 3px solid #1C1E23;
-    border-radius: 7px; padding: 8px 6px 6px 6px; text-align: center; color: {INK_DIM};
-}}
-QPushButton[keycap="true"]:hover {{ background: {KEYCAP_HI}; color: {INK}; }}
-QPushButton[keycap="true"]:checked {{
-    background: {KEYCAP_HI}; color: {AMBER}; border: 1px solid {AMBER}; border-bottom: 3px solid {AMBER_LO};
-    font-weight: 600;
-}}
-QPushButton[keycap="true"]:focus {{ border-color: {AMBER}; }}
 
 QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox, QPlainTextEdit {{
     background: {PLATE}; border: 1px solid {EDGE}; border-radius: 5px;
@@ -175,7 +177,7 @@ QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus, QComboBox:focus, QPlainTe
     border-color: {AMBER};
 }}
 QLineEdit:disabled, QSpinBox:disabled, QComboBox:disabled {{ color: {INK_OFF}; }}
-QLineEdit[role="mono"] {{ font-family: "{FONT_MONO}"; }}
+QLineEdit[role="mono"] {{ font-family: {css_family(FONT_MONO)}; font-size: {SIZE_BODY}px; }}
 QSpinBox::up-button, QSpinBox::down-button, QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{
     width: 18px; border: none; background: transparent; subcontrol-origin: border;
 }}
@@ -219,6 +221,11 @@ QListWidget::item, QTreeWidget::item {{ padding: 6px 8px; border-radius: 4px; }}
 QListWidget::item:hover, QTreeWidget::item:hover {{ background: {KEYCAP}; }}
 QListWidget::item:selected, QTreeWidget::item:selected {{ background: {KEYCAP_HI}; color: {AMBER}; }}
 QTableWidget {{ gridline-color: {KEYCAP}; }}
+QTableWidget QSpinBox, QTableWidget QComboBox {{
+    background: transparent; border: 1px solid transparent; border-radius: 4px; padding: 1px 6px; min-height: 0;
+}}
+QTableWidget QSpinBox:hover, QTableWidget QComboBox:hover {{ border-color: {EDGE}; }}
+QTableWidget QSpinBox:focus, QTableWidget QComboBox:focus {{ border-color: {AMBER}; }}
 QTableWidget::item {{ padding: 4px 6px; }}
 QTableWidget::item:selected {{ background: {KEYCAP_HI}; color: {AMBER}; }}
 QHeaderView::section {{

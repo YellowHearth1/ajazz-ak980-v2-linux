@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import subprocess
 import time
 from dataclasses import dataclass, field
 
@@ -119,11 +120,29 @@ def frame_files(directory: str) -> list[str]:
     return sorted(files, key=key)
 
 
+def _font_path() -> str | None:
+    """Ubuntu Bold for captions: the bundled copy, the distribution's file, or what fontconfig finds."""
+    candidates = [os.path.join(FONT_DIR, "Ubuntu-B.ttf"), "/usr/share/fonts/ubuntu/Ubuntu-B.ttf",
+                  "/usr/share/fonts/truetype/ubuntu/Ubuntu-B.ttf"]
+    for path in candidates:
+        if os.path.isfile(path):
+            return path
+    try:
+        found = subprocess.run(["fc-match", "-f", "%{file}", "Ubuntu:bold"], capture_output=True, text=True,
+                               timeout=3).stdout.strip()
+        if found and os.path.isfile(found):
+            return found
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return None
+
+
 def _font(size: int) -> ImageFont.ImageFont:
-    for name in (os.path.join(FONT_DIR, "FiraSansCondensed-SemiBold.ttf"), "DejaVuSans-Bold.ttf",
-                 "/usr/share/fonts/TTF/DejaVuSans-Bold.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"):
+    for path in (_font_path(), "DejaVuSans-Bold.ttf", "/usr/share/fonts/TTF/DejaVuSans-Bold.ttf"):
+        if not path:
+            continue
         try:
-            return ImageFont.truetype(name, size)
+            return ImageFont.truetype(path, size)
         except OSError:
             continue
     return ImageFont.load_default()

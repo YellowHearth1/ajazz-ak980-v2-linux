@@ -277,7 +277,8 @@ class KeyboardStage(QWidget):
             ink = QColor(theme.INK_DIM)
         upper, lower = _legend(k.label)
         caption = self.captions.get(k.index)
-        f = QFont(theme.FONT_BODY)
+        f = QFont()
+        f.setFamilies(theme.families(theme.FONT_BODY))
         f.setWeight(QFont.Weight.Medium)
         size = 8.6 if len(lower) <= 2 else 7.2 if len(lower) <= 5 else 6.2
         f.setPixelSize(10)
@@ -295,8 +296,9 @@ class KeyboardStage(QWidget):
                 Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
             p.drawText(text_area, align, lower)
         if caption:
-            cf = QFont(theme.FONT_BODY)
-            cf.setWeight(QFont.Weight.DemiBold)
+            cf = QFont()
+            cf.setFamilies(theme.families(theme.FONT_BODY))
+            cf.setWeight(QFont.Weight.Bold)
             cf.setPointSizeF(4.8)
             p.setFont(cf)
             p.setPen(QColor(theme.AMBER))

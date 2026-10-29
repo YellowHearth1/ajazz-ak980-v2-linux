@@ -34,7 +34,7 @@ jobs:
       - name: Build the package from this commit
         run: |
           pacman -Syu --noconfirm --needed base-devel python-build python-installer python-setuptools python-wheel \
-            python-pytest python-pyqt6 python-pillow python-numpy qt6-svg ttf-fira-sans ttf-fira-mono
+            python-pytest python-pyqt6 python-pillow python-numpy qt6-svg ttf-ubuntu-font-family
           useradd -m builder
           make dist
           cp dist/*.tar.gz packaging/arch/

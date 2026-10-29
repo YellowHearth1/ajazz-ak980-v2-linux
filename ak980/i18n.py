@@ -72,6 +72,12 @@ def language() -> str:
     return _lang
 
 
+def decimal(value: float, digits: int = 1) -> str:
+    """A number with the decimal separator of the interface language (1.5 / 1,5)."""
+    text = f"{value:.{digits}f}"
+    return text.replace(".", ",") if _lang == "uk" else text
+
+
 def tr(text: str, **kwargs) -> str:
     """Translates ``text``; keyword arguments are substituted with ``str.format``."""
     out = _catalog.get(text, text)

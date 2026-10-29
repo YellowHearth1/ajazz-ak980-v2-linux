@@ -9,7 +9,7 @@ from ... import APP_TITLE, HOMEPAGE, ISSUES, __version__, permissions, runtime, 
 from ...i18n import LANGUAGES, tr
 from ...lighting import SLEEP_CHOICES
 from .. import theme
-from ..widgets import Dot, Form, Segmented, SliderRow, Toggle, button, column, combo, heading, label
+from ..widgets import Dot, Form, Segmented, SliderRow, StatusLine, Toggle, button, column, combo, heading, label
 from . import Page
 
 FIRMWARE_COMBOS = [
@@ -37,12 +37,12 @@ class DevicePage(Page):
         self.fn = Toggle(tr("Fn works as a switch"), o.fn_switch)
         self.fn.setToolTip(tr("Press Fn once to turn the Fn layer on, again to turn it off"))
         for t in (self.win_lock, self.alt_tab, self.alt_f4, self.fn):
-            kb.add(None, t)
+            kb.full(t)
         self.sleep = Segmented([(i, tr(x)) for i, x in enumerate(SLEEP_CHOICES)], o.sleep_time)
-        kb.add(tr("Sleep after"), self.sleep)
+        kb.stacked(tr("Sleep after"), self.sleep)
         self.response = SliderRow(1, 5, o.key_response)
         self.response.setToolTip(tr("Debounce: lower reacts faster, higher ignores accidental double presses"))
-        kb.add(tr("Key response"), self.response)
+        kb.stacked(tr("Key response"), self.response)
         self.options_button = button(tr("Send to keyboard"), "primary", "upload")
         self.options_button.clicked.connect(self.send_options)
         kb_col = column(heading(tr("Keyboard")), kb, self.options_button,
@@ -88,7 +88,7 @@ class DevicePage(Page):
         access_row = QHBoxLayout()
         self.access_dot = Dot()
         access_row.addWidget(self.access_dot)
-        self.access_text = label("")
+        self.access_text = label("", wrap=True)
         access_row.addWidget(self.access_text, 1)
         pc.addLayout(access_row)
         self.access_button = button(tr("Allow access"), None, "shield",
@@ -102,14 +102,14 @@ class DevicePage(Page):
         prefs.add(tr("Language"), self.language)
         self.animations = Toggle(tr("Interface animations"), self.cfg.settings.animations)
         self.animations.toggled.connect(self._animations)
-        prefs.add(None, self.animations)
+        prefs.full(self.animations)
         self.tray = Toggle(tr("Closing the window keeps the app in the tray"), self.cfg.settings.close_to_tray)
         self.tray.toggled.connect(self._tray)
-        prefs.add(None, self.tray)
+        prefs.full(self.tray)
         pc.addLayout(prefs)
-        self.lang_note = label("", "dim")
+        self.lang_note = StatusLine()
         pc.addWidget(self.lang_note)
-        b = button(tr("Send everything to the keyboard again"), None, "upload",
+        b = button(tr("Send everything again"), None, "upload",
                    tr("Lighting, options, macros, both key layers and the time — for example after a reset"))
         b.clicked.connect(self.send_all)
         pc.addWidget(b)
@@ -117,7 +117,7 @@ class DevicePage(Page):
         pc.addWidget(heading(tr("On the keyboard itself")))
         combos = Form()
         for keys, what in FIRMWARE_COMBOS:
-            combos.add(tr(keys), label(tr(what)))
+            combos.add(tr(keys), label(tr(what), wrap=True))
         pc.addLayout(combos)
         pc.addSpacing(theme.S2)
         pc.addWidget(heading(tr("About")))

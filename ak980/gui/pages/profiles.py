@@ -13,7 +13,7 @@ from ...agent import running_processes
 from ...config import Profile, Rule, export_profile, import_profile
 from ...i18n import tr
 from .. import theme
-from ..widgets import Toggle, button, heading, label
+from ..widgets import StatusLine, Toggle, button, heading, label
 from . import Page
 
 
@@ -99,13 +99,11 @@ class ProfilesPage(Page):
         row.addWidget(b)
         row.addStretch()
         mid.addLayout(row)
-        row = QHBoxLayout()
-        row.addWidget(label(tr("When none of them runs"), "label"))
+        mid.addWidget(label(tr("After the program exits"), "label", wrap=True))
         self.default = QComboBox()
         self.default.currentIndexChanged.connect(self._default)
-        row.addWidget(self.default, 1)
-        mid.addLayout(row)
-        self.agent_note = label("", "dim", wrap=True)
+        mid.addWidget(self.default)
+        self.agent_note = StatusLine()
         mid.addWidget(self.agent_note)
 
         right = QVBoxLayout()
@@ -231,7 +229,7 @@ class ProfilesPage(Page):
             self.rules.setCellWidget(row, 1, box)
         self.default.blockSignals(True)
         self.default.clear()
-        self.default.addItem(tr("Keep the current profile"), "")
+        self.default.addItem(tr("Go back to the previous profile"), "")
         for name in self.cfg.names():
             self.default.addItem(name, name)
         self.default.setCurrentIndex(max(0, self.default.findData(s.default_profile)))

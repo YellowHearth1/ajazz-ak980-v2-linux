@@ -19,7 +19,7 @@ EXE     = $(BINDIR)/ak980
 INIT    = ak980/data/init
 SUBST   = sed "s|@AK980@|$(EXE)|g"
 
-.PHONY: all wheel test lint install install-python install-data install-systemd install-openrc \
+.PHONY: all wheel test lint layout install install-python install-data install-systemd install-openrc \
         install-dinit install-runit install-s6 uninstall dist screenshots appimage clean
 
 all: wheel
@@ -32,6 +32,9 @@ test:
 
 lint:
 	$(PYTHON) -m pyflakes ak980 tests tools
+
+layout:
+	QT_QPA_PLATFORM=offscreen $(PYTHON) tools/layout_audit.py
 
 install: install-python install-data install-systemd
 
@@ -93,7 +96,8 @@ uninstall:
 
 dist:
 	mkdir -p dist
-	tar --exclude-vcs --exclude="__pycache__" --exclude="./dist" --exclude="./build" --exclude="*.egg-info" \
+	tar --exclude-vcs --exclude="__pycache__" --exclude=".pytest_cache" --exclude="./dist" --exclude="./build" \
+	    --exclude="*.egg-info" \
 	    --exclude="./packaging/arch/src" --exclude="./packaging/arch/pkg" --exclude="*.pkg.tar.*" \
 	    --exclude="*.AppImage" --exclude="./packaging/arch/*.tar.gz" \
 	    --transform "s|^\.|$(SLUG)-$(VERSION)|" -czf dist/$(SLUG)-$(VERSION).tar.gz .

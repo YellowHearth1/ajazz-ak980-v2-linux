@@ -1,13 +1,13 @@
 [build-system]
-requires = ["setuptools>=64", "wheel"]
+requires = ["setuptools>=77"]      # PEP 639 licence fields
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "ajazz-ak980-v2-linux"
 description = "Ajazz AK980 V2 | Software for Linux: screen clock and GIFs, lighting, per-key colours, PC lighting effects, key remapping, macros and profiles"
 readme = "README.md"
-license = "MIT"
-license-files = ["LICENSE", "ak980/data/fonts/OFL.txt"]
+license = "MIT AND Ubuntu-font-1.0"     # the Ubuntu fonts are bundled for the AppImage
+license-files = ["LICENSE", "ak980/data/fonts/UFL.txt"]
 authors = [{ name = "yellowhearth1" }]
 requires-python = ">=3.10"
 dependencies = ["PyQt6>=6.4", "Pillow>=9", "numpy>=1.22"]

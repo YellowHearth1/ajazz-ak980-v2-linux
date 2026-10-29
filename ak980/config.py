@@ -10,6 +10,7 @@ from __future__ import annotations
 import copy
 import json
 import os
+import time
 from dataclasses import dataclass, field
 
 from .i18n import tr
@@ -212,7 +213,16 @@ class Config:
         try:
             with open(path, encoding="utf-8") as f:
                 d = json.load(f)
-        except (OSError, ValueError):
+        except OSError:
+            return c
+        except ValueError:
+            # Unreadable JSON: keep it next to the new one rather than overwrite it later
+            try:
+                os.replace(path, f"{path}.broken-{int(time.time())}")
+            except OSError:
+                pass
+            return c
+        if not isinstance(d, dict):
             return c
         if "profiles" not in d:
             return cls._migrate_v1(d, path)

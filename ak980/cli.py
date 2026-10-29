@@ -392,7 +392,7 @@ def cmd_auto(a, cfg) -> None:
     for r in s.rules:
         print(f"  {r.process} → {r.profile}")
     if s.default_profile:
-        _say(tr("Otherwise: {name}", name=s.default_profile))
+        _say(tr("After the program exits: {name}", name=s.default_profile))
 
 
 def cmd_service(a, cfg) -> None:

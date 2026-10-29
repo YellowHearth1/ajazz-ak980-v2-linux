@@ -27,6 +27,24 @@ def _palette():
     return pal
 
 
+def number_locale(lang: str) -> None:
+    """Numbers in spin boxes follow the interface language, not only the system locale."""
+    from PyQt6.QtCore import QLocale
+    QLocale.setDefault(QLocale(QLocale.Language.Ukrainian if lang == "uk" else QLocale.Language.English,
+                               QLocale.Country.Ukraine if lang == "uk" else QLocale.Country.UnitedStates))
+
+
+def prepare(app, lang: str) -> None:
+    """Style, palette, fonts and number format; the screenshot and layout tools use it too."""
+    from . import theme
+    number_locale(lang)
+    app.setStyle("Fusion")
+    app.setPalette(_palette())
+    theme.load_fonts()
+    app.setFont(theme.font("body"))
+    app.setStyleSheet(theme.stylesheet())
+
+
 def main(tray: bool = False) -> int:
     from PyQt6.QtNetwork import QLocalServer, QLocalSocket
     from PyQt6.QtWidgets import QApplication
@@ -35,7 +53,7 @@ def main(tray: bool = False) -> int:
     from ..config import peek_language
     from ..i18n import set_language
 
-    set_language(peek_language())
+    lang = set_language(peek_language())
 
     app = QApplication(sys.argv)
     app.setApplicationName("ak980")
@@ -44,7 +62,8 @@ def main(tray: bool = False) -> int:
     app.setQuitOnLastWindowClosed(False)
 
     # One window per user: a second start just brings the first one forward
-    name = f"ak980-gui-{os.getuid()}"
+    from ..runtime import runtime_dir
+    name = os.path.join(runtime_dir(), "ak980-gui.sock")
     probe = QLocalSocket()
     probe.connectToServer(name)
     if probe.waitForConnected(300):
@@ -56,14 +75,10 @@ def main(tray: bool = False) -> int:
     server = QLocalServer()
     server.listen(name)
 
-    from . import icons, theme
+    from . import icons
     from .window import MainWindow
-    app.setStyle("Fusion")
-    app.setPalette(_palette())
-    theme.load_fonts()
-    app.setFont(theme.font("body"))
+    prepare(app, lang)
     app.setWindowIcon(icons.app_icon())
-    app.setStyleSheet(theme.stylesheet())
 
     win = MainWindow()
     server.newConnection.connect(lambda: (server.nextPendingConnection(), win.show_window()))

@@ -18,15 +18,15 @@ colors:
   error: "#FF6B5E"
 typography:
   display:
-    fontFamily: Fira Sans Condensed
-    fontSize: 22px (title), 16px (section headings)
-    fontWeight: 600
+    fontFamily: Ubuntu
+    fontSize: 22px (title, bold), 17px (section headings, medium)
+    fontWeight: 700 / 500
   body:
-    fontFamily: Fira Sans
-    fontSize: 13px
+    fontFamily: Ubuntu
+    fontSize: 14px (text), 13px (labels)
   data:
-    fontFamily: Fira Mono
-    fontSize: 12px
+    fontFamily: Ubuntu Mono
+    fontSize: 14px
 rounded:
   keycap: 7px
   control: 6px
@@ -65,10 +65,11 @@ setting.
 
 ## Typography
 
-Fira Sans Condensed SemiBold for the title, section headings and big numbers; Fira Sans for
-everything else; Fira Mono only where a reader scans data (hex colours, bytes, frame delays,
-percentages). Sentence case everywhere. The fonts are bundled for the AppImage and come from the
-system in packages.
+The Ubuntu family throughout, chosen for legibility at small sizes on a dark ground and for its
+full Cyrillic: Bold for the title, Medium for section headings and key legends, Regular for text,
+Ubuntu Mono only where a reader scans data (hex colours, bytes, frame delays, percentages). Body
+text is 14 px, labels 13 px. If only Ubuntu Nerd Font is installed, it is used instead. Sentence
+case everywhere. The fonts are bundled for the AppImage and come from the system in packages.
 
 ## Layout
 
@@ -95,7 +96,7 @@ Radius by role: keycap-like choices 7 px with a 3 px darker bottom edge (they re
 ## Do's and don'ts
 
 - Do derive every new colour, size and radius from the tokens above.
-- Do write controls as actions ("Upload to keyboard", "Write layer to keyboard") and keep the same
+- Do write controls as actions ("Upload to the screen", "Write layer to keyboard") and keep the same
   verb in the result ("Animation uploaded").
 - Do show state honestly: say when something needs the cable, the agent, or another package.
 - Don't use emoji, the stock icon sets or icons in tinted squares; the icons are drawn for this app.

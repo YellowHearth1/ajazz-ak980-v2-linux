@@ -22,8 +22,8 @@ def demo_animation(path: str) -> None:
     """An original animation for the screen page: drifting light bands behind a caption."""
     import numpy as np
     from PIL import Image, ImageDraw, ImageFont
-    font = ImageFont.truetype(os.path.join(ROOT, "ak980", "data", "fonts", "FiraSansCondensed-Bold.ttf"), 34)
-    small = ImageFont.truetype(os.path.join(ROOT, "ak980", "data", "fonts", "FiraSansCondensed-SemiBold.ttf"), 15)
+    font = ImageFont.truetype(os.path.join(ROOT, "ak980", "data", "fonts", "Ubuntu-B.ttf"), 32)
+    small = ImageFont.truetype(os.path.join(ROOT, "ak980", "data", "fonts", "Ubuntu-M.ttf"), 15)
     y, x = np.mgrid[0:135, 0:240].astype(np.float32)
     frames = []
     for i in range(24):
@@ -94,15 +94,10 @@ def shoot(out_dir: str, lang: str) -> None:
 
     sys.path.insert(0, ROOT)
     from ak980 import gui
-    from ak980.gui import theme
     from ak980.i18n import set_language
     set_language(lang)
     app = QApplication(sys.argv[:1])
-    app.setStyle("Fusion")
-    app.setPalette(gui._palette())
-    theme.load_fonts()
-    app.setFont(theme.font("body"))
-    app.setStyleSheet(theme.stylesheet())
+    gui.prepare(app, lang)
     from ak980.gui.window import MainWindow
     win = MainWindow()
     win.resize(1440, 900)

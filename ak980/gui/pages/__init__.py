@@ -41,6 +41,7 @@ class Page(QWidget):
         for i, lay in enumerate(layouts):
             if i:
                 row.addWidget(rule(vertical=True))
+            lay.setContentsMargins(0, 0, 0, 0)    # or Qt's default margins shift the column down
             holder = QWidget()
             holder.setLayout(lay)
             row.addWidget(holder, (stretches or [1] * len(layouts))[i])

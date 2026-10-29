@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import Iterable, Sequence
 
-from PyQt6.QtCore import QPointF, QRectF, QSize, Qt, pyqtSignal
-from PyQt6.QtGui import QColor, QImage, QLinearGradient, QMouseEvent, QPainter, QPen
+from PyQt6.QtCore import QEvent, QPointF, QRect, QRectF, QSize, Qt, pyqtSignal
+from PyQt6.QtGui import QColor, QFont, QFontMetrics, QImage, QLinearGradient, QMouseEvent, QPainter, QPen
 from PyQt6.QtWidgets import (QAbstractButton, QButtonGroup, QComboBox, QFrame, QGridLayout, QHBoxLayout, QLabel,
                              QLineEdit, QPushButton, QSizePolicy, QSlider, QVBoxLayout, QWidget)
 
@@ -50,7 +50,9 @@ def heading(text: str) -> QLabel:
 
 
 class Toggle(QAbstractButton):
-    """An on/off switch with its label; Space toggles it."""
+    """An on/off switch with its label; Space toggles it. A long label wraps onto more lines."""
+
+    TRACK_W, TRACK_H, GAP = 34, 18, 10
 
     def __init__(self, text: str = "", checked: bool = False):
         super().__init__()
@@ -59,18 +61,48 @@ class Toggle(QAbstractButton):
         self.setText(text)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
-        self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+        policy = QSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum)
+        policy.setHeightForWidth(True)
+        self.setSizePolicy(policy)
+
+    def _text_x(self) -> int:
+        return self.TRACK_W + 2 + self.GAP
+
+    def _text_height(self, width: int) -> int:
+        if not self.text():
+            return 0
+        avail = max(20, width - self._text_x())
+        return self.fontMetrics().boundingRect(QRect(0, 0, avail, 100000), Qt.TextFlag.TextWordWrap,
+                                               self.text()).height()
+
+    def hasHeightForWidth(self) -> bool:
+        return True
+
+    def heightForWidth(self, width: int) -> int:
+        return max(24, self._text_height(width) + 4)
 
     def sizeHint(self) -> QSize:
+        if not self.text():
+            return QSize(self.TRACK_W + 4, 24)
+        w = self._text_x() + self.fontMetrics().horizontalAdvance(self.text()) + 2
+        return QSize(w, self.heightForWidth(w))
+
+    def minimumSizeHint(self) -> QSize:
+        if not self.text():
+            return QSize(self.TRACK_W + 4, 24)
         fm = self.fontMetrics()
-        return QSize(38 + (fm.horizontalAdvance(self.text()) + 10 if self.text() else 0), 24)
+        longest = max(fm.horizontalAdvance(word) for word in self.text().split())
+        return QSize(self._text_x() + min(fm.horizontalAdvance(self.text()), max(longest, 90)) + 2, 24)
 
     def paintEvent(self, _) -> None:
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         on = self.isChecked()
         enabled = self.isEnabled()
-        track = QRectF(1, 4, 34, 18)
+        fm = self.fontMetrics()
+        one_line = self._text_height(self.width()) <= fm.lineSpacing() + 1
+        top = (self.height() - self.TRACK_H) / 2 if one_line else (fm.lineSpacing() - self.TRACK_H) / 2 + 2
+        track = QRectF(1, max(1.0, top), self.TRACK_W, self.TRACK_H)
         p.setPen(QPen(theme.color(theme.AMBER_LO if on else theme.EDGE), 1))
         p.setBrush(theme.color(theme.AMBER if on else theme.PLATE, 1.0 if enabled else 0.4))
         p.drawRoundedRect(track, 9, 9)
@@ -85,11 +117,68 @@ class Toggle(QAbstractButton):
         if self.text():
             p.setPen(theme.color(theme.INK if enabled else theme.INK_OFF))
             p.setFont(self.font())
-            p.drawText(QRectF(44, 0, self.width() - 44, self.height()),
-                       Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft, self.text())
+            align = Qt.AlignmentFlag.AlignVCenter if one_line else Qt.AlignmentFlag.AlignTop
+            p.drawText(QRectF(self._text_x(), 0 if one_line else 2, self.width() - self._text_x(), self.height()),
+                       int(align | Qt.AlignmentFlag.AlignLeft) | int(Qt.TextFlag.TextWordWrap), self.text())
 
     def hitButton(self, pos) -> bool:
         return self.rect().contains(pos)
+
+
+class StatusLine(QLabel):
+    """Status text that is hidden while empty, so an unused line leaves no gap in the layout."""
+
+    def __init__(self, role: str | None = "dim", wrap: bool = True):
+        super().__init__()
+        if role:
+            self.setProperty("role", role)
+        self.setWordWrap(wrap)
+        self.hide()
+
+    def setText(self, text: str) -> None:
+        super().setText(text)
+        self.setVisible(bool(text))
+
+
+class ElidedLabel(QLabel):
+    """One line of text that ends in an ellipsis when there is no room; the full text is in the tooltip."""
+
+    def __init__(self, text: str = "", role: str | None = None):
+        super().__init__()
+        if role:
+            self.setProperty("role", role)
+        self._full = ""
+        self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        self.setText(text)
+
+    def setText(self, text: str) -> None:
+        self._full = text or ""
+        self._elide()
+
+    def text(self) -> str:
+        return self._full
+
+    def _elide(self) -> None:
+        width = self.contentsRect().width()
+        shown = self.fontMetrics().elidedText(self._full, Qt.TextElideMode.ElideRight, width) if width > 0 \
+            else self._full
+        super().setText(shown)
+        self.setToolTip(self._full if shown != self._full else "")
+
+    def resizeEvent(self, e) -> None:
+        super().resizeEvent(e)
+        self._elide()
+
+    def changeEvent(self, e) -> None:
+        super().changeEvent(e)
+        if e.type() in (QEvent.Type.FontChange, QEvent.Type.StyleChange):
+            self._elide()
+
+    def sizeHint(self) -> QSize:
+        return QSize(self.fontMetrics().horizontalAdvance(self._full) + 4, super().sizeHint().height())
+
+    def minimumSizeHint(self) -> QSize:
+        return QSize(0, super().minimumSizeHint().height())
 
 
 class Segmented(QWidget):
@@ -386,6 +475,67 @@ class ColorChip(QPushButton):
         pop.show()
 
 
+class KeycapButton(QAbstractButton):
+    """A choice drawn as a keycap. A long label wraps onto a second line instead of widening the grid."""
+
+    PAD_X, PAD_Y = 10, 7
+
+    def __init__(self, text: str, min_height: int = 38):
+        super().__init__()
+        self.setText(text)
+        self.setCheckable(True)
+        self.min_height = min_height
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.setAttribute(Qt.WidgetAttribute.WA_Hover)
+        policy = QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+        policy.setHeightForWidth(True)
+        self.setSizePolicy(policy)
+
+    def _font(self) -> QFont:
+        f = QFont(self.font())
+        f.setWeight(QFont.Weight.Medium)
+        return f
+
+    def _text_height(self, width: int) -> int:
+        return QFontMetrics(self._font()).boundingRect(
+            QRect(0, 0, max(10, width - 2 * self.PAD_X), 100000),
+            int(Qt.AlignmentFlag.AlignCenter) | int(Qt.TextFlag.TextWordWrap), self.text()).height()
+
+    def hasHeightForWidth(self) -> bool:
+        return True
+
+    def heightForWidth(self, width: int) -> int:
+        return max(self.min_height, self._text_height(width) + 2 * self.PAD_Y + 3)
+
+    def sizeHint(self) -> QSize:
+        w = QFontMetrics(self._font()).horizontalAdvance(self.text()) + 2 * self.PAD_X
+        return QSize(w, self.heightForWidth(w))
+
+    def minimumSizeHint(self) -> QSize:
+        fm = QFontMetrics(self._font())
+        longest = max((fm.horizontalAdvance(word) for word in self.text().split()), default=20)
+        return QSize(longest + 2 * self.PAD_X + 2, self.min_height)
+
+    def paintEvent(self, _) -> None:
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        on, hover, enabled = self.isChecked(), self.underMouse(), self.isEnabled()
+        r = QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5)
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(theme.color(theme.AMBER_LO if on else "#1C1E23"))
+        p.drawRoundedRect(r, 7, 7)
+        face = r.adjusted(0, 0, 0, -3)
+        p.setBrush(theme.color(theme.KEYCAP_HI if (on or hover) and enabled else theme.KEYCAP))
+        p.setPen(QPen(theme.color(theme.AMBER if on or self.hasFocus() else "#23252B"), 1))
+        p.drawRoundedRect(face, 7, 7)
+        color = theme.INK_OFF if not enabled else theme.AMBER if on else theme.INK if hover else theme.INK_DIM
+        p.setPen(theme.color(color))
+        p.setFont(self._font())
+        p.drawText(face.adjusted(self.PAD_X, 2, -self.PAD_X, -2),
+                   int(Qt.AlignmentFlag.AlignCenter) | int(Qt.TextFlag.TextWordWrap), self.text())
+
+
 class KeycapGrid(QWidget):
     """Choices drawn as keycaps, e.g. the lighting effects."""
     changed = pyqtSignal(object)
@@ -399,14 +549,11 @@ class KeycapGrid(QWidget):
         self.group = QButtonGroup(self)
         self.values = [v for v, _ in options]
         for i, (v, text) in enumerate(options):
-            b = QPushButton(text)
-            b.setCheckable(True)
-            b.setProperty("keycap", "true")
-            b.setMinimumHeight(min_height)
-            b.setCursor(Qt.CursorShape.PointingHandCursor)
-            b.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+            b = KeycapButton(text, min_height)
             self.group.addButton(b, i)
             grid.addWidget(b, i // columns, i % columns)
+        for c in range(columns):
+            grid.setColumnStretch(c, 1)
         if value is not None:
             self.set_value(value)
         self.group.idClicked.connect(lambda i: self.changed.emit(self.values[i]))
@@ -434,8 +581,11 @@ class Form(QGridLayout):
     def add(self, text: str | None, widget: QWidget | QHBoxLayout) -> QLabel | None:
         lab = None
         if text:
-            lab = label(text, "label")
-            lab.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            lab = label(text, "label", wrap=True)
+            # A tall control (a colour picker) gets its label at the top, not floating in the middle
+            tall = widget.sizeHint().height() > 3 * lab.fontMetrics().height()
+            lab.setAlignment(Qt.AlignmentFlag.AlignRight
+                             | (Qt.AlignmentFlag.AlignTop if tall else Qt.AlignmentFlag.AlignVCenter))
             self.addWidget(lab, self._row, 0)
         if isinstance(widget, QWidget):
             self.addWidget(widget, self._row, 1)
@@ -444,9 +594,19 @@ class Form(QGridLayout):
         self._row += 1
         return lab
 
-    def full(self, widget: QWidget) -> None:
-        self.addWidget(widget, self._row, 0, 1, 2)
+    def full(self, widget: QWidget | QHBoxLayout) -> None:
+        if isinstance(widget, QWidget):
+            self.addWidget(widget, self._row, 0, 1, 2)
+        else:
+            self.addLayout(widget, self._row, 0, 1, 2)
         self._row += 1
+
+    def stacked(self, text: str, widget: QWidget | QHBoxLayout) -> QLabel:
+        """The label on its own line above a wide control."""
+        lab = label(text, "label", wrap=True)
+        self.full(lab)
+        self.full(widget)
+        return lab
 
 
 def combo(options: Iterable[tuple[object, str]], value=None) -> QComboBox:

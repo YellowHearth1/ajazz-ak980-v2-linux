@@ -33,7 +33,7 @@ check() {
 }
 
 package_ajazz-ak980-v2-linux() {
-  depends=(python python-pyqt6 python-pillow python-numpy qt6-svg ttf-fira-sans ttf-fira-mono)
+  depends=(python python-pyqt6 python-pillow python-numpy qt6-svg ttf-ubuntu-font-family)
   optdepends=('libpulse: music lighting effects through parec'
               'pipewire: music lighting effects through pw-record'
               'polkit: allow keyboard access and system services from the app'
@@ -45,7 +45,7 @@ package_ajazz-ak980-v2-linux() {
   python -m installer --destdir="$pkgdir" dist/*.whl
   make DESTDIR="$pkgdir" PREFIX=/usr install-data install-systemd
 
-  # Fira comes from ttf-fira-sans and ttf-fira-mono; the bundled copy is for the AppImage
+  # The Ubuntu fonts come from ttf-ubuntu-font-family; the bundled copy is for the AppImage
   local site
   site=$(python -c "import site; print(site.getsitepackages()[0])")
   rm -r "$pkgdir$site/ak980/data/fonts"

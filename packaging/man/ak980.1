@@ -1,4 +1,4 @@
-.TH AK980 1 "2026-10-28" "ak980 0.0.1" "User Commands"
+.TH AK980 1 "2026-10-29" "ak980 0.0.1" "User Commands"
 .SH NAME
 ak980 \- configure the AJAZZ AK980 V2 keyboard
 .SH SYNOPSIS
@@ -71,7 +71,8 @@ Make one of F13\(enF24 run a program or open a link; send that key from a remapp
 Manage profiles. \fBuse\fR switches and sends the profile to the keyboard.
 .TP
 .B auto on|off|list|add \fIPROCESS PROFILE\fB|rm \fIPROCESS\fB|default \fR[\fIPROFILE\fR]
-Switch profiles automatically while a program runs.
+Switch profiles automatically while a program runs. \fBdefault\fR names the profile to use
+after the program exits; without one, the profile that was on before comes back.
 .TP
 .B service list|enable \fIID\fB|disable \fIID
 Start the agent automatically. IDs: session (XDG autostart), systemd-user, dinit-user,

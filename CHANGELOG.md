@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.0.1 — 2026-10-28
+## 0.0.1 — 2026-10-29
 
 First public release.
 
@@ -16,7 +16,7 @@ First public release.
   and launching programs or links through F13–F24.
 - Macros: recording with real pauses, text, shortcuts, mouse clicks, editable pauses.
 - Profiles: export/import, switching from the header and the tray, automatic switching while a
-  program runs.
+  program runs and back when it exits.
 - Background agent and services for XDG autostart, systemd, dinit, OpenRC, runit and s6.
 - Packages: Arch/Artix split PKGBUILD, AppImage, Makefile for other distributions; man page and
   bash/zsh/fish completions.

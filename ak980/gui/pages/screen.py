@@ -11,9 +11,10 @@ from PyQt6.QtWidgets import (QFileDialog, QHBoxLayout, QLineEdit, QMenu, QProgre
                              QDoubleSpinBox, QVBoxLayout, QWidget)
 
 from ... import lcd
-from ...i18n import plural, tr
+from ...i18n import decimal, plural, tr
 from .. import icons, theme
-from ..widgets import (ColorChip, Form, Segmented, SliderRow, Toggle, button, column, combo, heading, label)
+from ..widgets import (ColorChip, ElidedLabel, Form, Segmented, SliderRow, StatusLine, Toggle, button, column, combo,
+                       heading, label)
 from . import Page
 
 POSITIONS = [("top-left", "Top left"), ("top", "Top"), ("top-right", "Top right"), ("center", "Centre"),
@@ -75,7 +76,7 @@ class Timeline(QWidget):
             p.drawText(QRectF(x, r.bottom() + 5, self.THUMB_W / 2, 16), Qt.AlignmentFlag.AlignLeft, str(i + 1))
             p.setPen(QColor(theme.AMBER if i == self.current else theme.INK_DIM))
             p.drawText(QRectF(x + self.THUMB_W / 3, r.bottom() + 5, self.THUMB_W * 2 / 3, 16),
-                       Qt.AlignmentFlag.AlignRight, f"{self.delays[i]} ms")
+                       Qt.AlignmentFlag.AlignRight, f"{self.delays[i]}{tr(' ms')}")
         if not self.thumbs:
             p.setPen(QColor(theme.INK_DIM))
             p.setFont(theme.font("body"))
@@ -140,7 +141,7 @@ class ScreenPage(Page):
         self.history_button.clicked.connect(self.show_history)
         top.addWidget(self.history_button)
         top.addSpacing(theme.S3)
-        self.info = label("", "dim")
+        self.info = ElidedLabel("", "dim")
         top.addWidget(self.info, 1)
         self.play_button = button("", "ghost", "pause", tr("Pause the preview"))
         self.play_button.clicked.connect(self.toggle_play)
@@ -165,7 +166,7 @@ class ScreenPage(Page):
         frame_row.addWidget(self.frame_label)
         self.frame_delay = QSpinBox()
         self.frame_delay.setRange(lcd.MIN_DELAY, lcd.MAX_DELAY)
-        self.frame_delay.setSuffix(" ms")
+        self.frame_delay.setSuffix(tr(" ms"))
         self.frame_delay.setToolTip(tr("How long this frame stays on the screen"))
         self.frame_delay.editingFinished.connect(self.set_frame_delay)
         frame_row.addWidget(self.frame_delay)
@@ -207,20 +208,14 @@ class ScreenPage(Page):
         self.delay = QSpinBox()
         self.delay.setRange(0, lcd.MAX_DELAY)
         self.delay.setSpecialValueText(tr("as in the file"))
-        self.delay.setSuffix(" ms")
+        self.delay.setSuffix(tr(" ms"))
         timing.add(tr("Every frame"), self.delay)
-        trim = QHBoxLayout()
         self.trim_start = QSpinBox()
         self.trim_end = QSpinBox()
         for w in (self.trim_start, self.trim_end):
             w.setRange(0, 9999)
-            w.setMaximumWidth(84)
-        trim.addWidget(self.trim_start)
-        trim.addWidget(label(tr("from the start,"), "dim"))
-        trim.addWidget(self.trim_end)
-        trim.addWidget(label(tr("from the end"), "dim"))
-        trim.addStretch()
-        timing.add(tr("Cut frames"), trim)
+        timing.add(tr("Cut frames from the start"), self.trim_start)
+        timing.add(tr("Cut frames from the end"), self.trim_end)
         self.step = QSpinBox()
         self.step.setRange(1, 20)
         self.step.setToolTip(tr("Keeps a long GIF within the screen's 140 frames"))
@@ -246,6 +241,7 @@ class ScreenPage(Page):
 
         # Upload
         up = QVBoxLayout()
+        up.setContentsMargins(0, 0, 0, 0)
         up.setSpacing(theme.S2 + 2)
         self.dither = Toggle(tr("Smooth gradients"), True)
         self.dither.setToolTip(tr("Dithers the colours to the panel's 65 thousand, so gradients show no bands"))
@@ -259,7 +255,8 @@ class ScreenPage(Page):
         slot_row.addWidget(self.slot)
         slot_row.addStretch()
         up.addLayout(slot_row)
-        self.upload_button = button(tr("Upload to keyboard"), "primary", "upload")
+        self.upload_button = button(tr("Upload to the screen"), "primary", "upload")
+        self.upload_button.setMinimumWidth(self.upload_button.sizeHint().width())
         self.upload_button.clicked.connect(self.upload)
         up.addWidget(self.upload_button)
         self.progress = QProgressBar()
@@ -270,7 +267,7 @@ class ScreenPage(Page):
         self.cancel_button.clicked.connect(lambda: setattr(self, "cancel", True))
         self.cancel_button.hide()
         up.addWidget(self.cancel_button)
-        self.upload_note = label("", "dim", wrap=True)
+        self.upload_note = StatusLine()
         up.addWidget(self.upload_note)
         up.addSpacing(theme.S3)
         up.addWidget(heading(tr("Clock")))
@@ -286,7 +283,7 @@ class ScreenPage(Page):
 
         up_holder = QWidget()
         up_holder.setLayout(up)
-        up_holder.setMinimumWidth(280)
+        up_holder.setMinimumWidth(220)
         timing_caption = column(heading(tr("Timing")), timing, spacing=theme.S3, stretch=False)
         timing_caption.addSpacing(theme.S3)
         timing_caption.addWidget(heading(tr("Caption")))
@@ -418,7 +415,7 @@ class ScreenPage(Page):
             loop = sum(d for _, d in frames) / 1000
             pages = lcd.page_count(n)
             text = (f"{os.path.basename(self.path.rstrip('/'))} · {plural(n, '{n} frame', '{n} frames')} · "
-                    + tr("loop {s} s", s=f"{loop:.1f}") + " · "
+                    + tr("loop {s} s", s=decimal(loop)) + " · "
                     + tr("upload ≈ {s} s", s=round(pages * lcd.SECONDS_PER_PAGE)))
             self.info.setText(text)
             over = available - n
@@ -493,9 +490,8 @@ class ScreenPage(Page):
         def work(progress):
             lcd.save_history(frames, path)
             blob = lcd.encode_animation(frames, dither)
-            from ...device import WiredKeyboard
-            with WiredKeyboard.open() as kb:
-                return kb.upload_lcd(blob, slot, progress=progress, cancel=lambda: self.cancel)
+            return self.win.wired(lambda kb: kb.upload_lcd(blob, slot, progress=progress,
+                                                           cancel=lambda: self.cancel))()
 
         def on_progress(p: float) -> None:
             self.progress.setValue(int(p * 1000))

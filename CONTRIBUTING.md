@@ -14,6 +14,10 @@ python -m pyflakes ak980 tests tools
 `AK980_PREVIEW_ONLY=1` renders everything but sends nothing to the keyboard; `make screenshots`
 uses it to regenerate `docs/screenshots` from a demo profile.
 
+After changing a page, run `make layout` (`tools/layout_audit.py`). It opens every page and editor
+in both languages at three window sizes and lists clipped text, widgets that stick out and pages
+that would need horizontal scrolling. `tests/test_layout.py` runs the same check at one size.
+
 ## Layout of the code
 
 | Path | What it is |

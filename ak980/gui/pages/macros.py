@@ -4,15 +4,16 @@ from __future__ import annotations
 
 import time
 
-from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtWidgets import (QAbstractItemView, QHBoxLayout, QHeaderView, QInputDialog, QListWidget, QMenu,
+from PyQt6.QtCore import QItemSelection, QItemSelectionModel, Qt, pyqtSignal
+from PyQt6.QtWidgets import (QAbstractItemView, QHBoxLayout, QHeaderView, QInputDialog, QListWidget,
+                             QListWidgetItem, QMenu,
                              QProgressBar, QPushButton, QSpinBox, QTableWidget, QTableWidgetItem, QVBoxLayout)
 
-from ...i18n import plural, tr
+from ...i18n import decimal, plural, tr
 from ...keymap import LINUX_TO_HID
 from ...macro import BUDGET_BYTES, MAX_DELAY, MIN_DELAY, MOUSE_BUTTON_LABELS, Macro, MacroStep, encode_macros, used_bytes
 from .. import icons, theme
-from ..widgets import Toggle, button, heading, label
+from ..widgets import ElidedLabel, Toggle, button, heading, label
 from . import Page
 
 
@@ -102,10 +103,13 @@ class MacrosPage(Page):
         left.addWidget(self.memory)
         left.addWidget(label(tr("A macro's number is its slot in the keyboard; keys refer to it on the Keys page."),
                              "dim", wrap=True))
+        self.write_button = button(tr("Write to keyboard"), "primary", "upload")
+        self.write_button.clicked.connect(self.write)
+        left.addWidget(self.write_button)
 
         right = QVBoxLayout()
         right.setSpacing(theme.S3)
-        self.steps_title = heading(tr("Steps"))
+        self.steps_title = ElidedLabel(tr("Steps"), "heading")
         right.addWidget(self.steps_title)
         rec = QHBoxLayout()
         self.recorder = Recorder()
@@ -113,16 +117,18 @@ class MacrosPage(Page):
         rec.addWidget(self.recorder)
         self.timing = Toggle(tr("Keep my real pauses"), True)
         self.timing.toggled.connect(lambda on: setattr(self.recorder, "with_timing", on))
-        rec.addWidget(self.timing)
-        rec.addStretch()
+        rec.addWidget(self.timing, 1)
+        right.addLayout(rec)
+        add = QHBoxLayout()
         for text, fn in ((tr("Type text…"), self.add_text), (tr("Shortcut…"), self.add_combo)):
             b = button(text)
             b.clicked.connect(fn)
-            rec.addWidget(b)
+            add.addWidget(b)
         self.click_button = button(tr("Mouse click"))
         self.click_button.clicked.connect(self.add_click)
-        rec.addWidget(self.click_button)
-        right.addLayout(rec)
+        add.addWidget(self.click_button)
+        add.addStretch()
+        right.addLayout(add)
 
         self.table = QTableWidget(0, 3)
         self.table.setHorizontalHeaderLabels([tr("Action"), tr("Key or button"), tr("Then wait, ms")])
@@ -133,25 +139,24 @@ class MacrosPage(Page):
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table.setMinimumHeight(260)
+        self.table.verticalHeader().setDefaultSectionSize(34)
         right.addWidget(self.table, 1)
 
         edit = QHBoxLayout()
-        edit.addWidget(label(tr("Pause after the selected steps"), "label"))
+        edit.addWidget(label(tr("Selected steps:"), "label"))
         self.delay = QSpinBox()
         self.delay.setRange(MIN_DELAY, MAX_DELAY)
-        self.delay.setSuffix(" ms")
+        self.delay.setSuffix(tr(" ms"))
+        self.delay.setToolTip(tr("Pause after each selected step"))
         self.delay.setValue(50)
         edit.addWidget(self.delay)
-        b = button(tr("Set"))
+        b = button(tr("Set pause"))
         b.clicked.connect(self.set_delay)
         edit.addWidget(b)
-        b = button(tr("Delete steps"), "ghost", "trash")
+        b = button(tr("Delete"), "ghost", "trash")
         b.clicked.connect(self.delete_steps)
         edit.addWidget(b)
         edit.addStretch()
-        self.write_button = button(tr("Write macros to keyboard"), "primary", "upload")
-        self.write_button.clicked.connect(self.write)
-        edit.addWidget(self.write_button)
         right.addLayout(edit)
 
         self.root.addLayout(self.columns(left, right, stretches=[3, 7]), 1)
@@ -177,7 +182,6 @@ class MacrosPage(Page):
         if self.macros:
             self.list.setCurrentRow(max(0, min(cur, len(self.macros) - 1)))
         else:
-            from PyQt6.QtWidgets import QListWidgetItem
             item = QListWidgetItem(tr("No macros yet. Press + or Record."))
             item.setFlags(Qt.ItemFlag.NoItemFlags)
             self.list.addItem(item)
@@ -215,7 +219,8 @@ class MacrosPage(Page):
                 self.table.setCellWidget(row, 2, spin)
             total = m.duration_ms()
             self.steps_title.setText(tr("Steps of “{name}”", name=m.name) + "  ·  " +
-                                     plural(len(m.steps), "{n} step", "{n} steps") + f"  ·  {total / 1000:.2f} s")
+                                     plural(len(m.steps), "{n} step", "{n} steps") + "  ·  " +
+                                     tr("{s} s", s=decimal(total / 1000, 2)))
         self._memory()
 
     def add(self) -> None:
@@ -308,10 +313,21 @@ class MacrosPage(Page):
     def set_delay(self) -> None:
         m = self.macro()
         if m:
-            for r in self._selected_rows():
+            rows = self._selected_rows()
+            for r in rows:
                 m.steps[r].delay = self.delay.value()
             self._changed()
             self.show_macro()
+            self._reselect(rows)
+
+    def _reselect(self, rows: list[int]) -> None:
+        """Keeps the same steps selected after the table is rebuilt."""
+        selection = QItemSelection()
+        model = self.table.model()
+        for r in rows:
+            if 0 <= r < self.table.rowCount():
+                selection.select(model.index(r, 0), model.index(r, self.table.columnCount() - 1))
+        self.table.selectionModel().select(selection, QItemSelectionModel.SelectionFlag.ClearAndSelect)
 
     def delete_steps(self) -> None:
         m = self.macro()

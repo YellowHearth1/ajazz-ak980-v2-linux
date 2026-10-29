@@ -13,6 +13,7 @@ from PyQt6.QtWidgets import (QAbstractButton, QApplication, QComboBox, QHBoxLayo
                              QMessageBox, QScrollArea, QStackedWidget, QSystemTrayIcon, QVBoxLayout, QWidget)
 
 from .. import APP_NAME, APP_TITLE, permissions, runtime
+from .. import config as cfgmod
 from ..config import Config
 from ..device import Dongle, NotConnected, WiredKeyboard, connection_state
 from ..engine import LightingEngine
@@ -20,7 +21,7 @@ from ..i18n import tr
 from ..layout import positions
 from . import icons, theme
 from .stage import KeyboardStage
-from .widgets import Dot, button, label
+from .widgets import Dot, ElidedLabel, StatusLine, button, label
 
 
 class _Signals(QObject):
@@ -108,6 +109,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.cfg = Config.load()
+        self._cfg_mtime = cfgmod.mtime(self.cfg.path)
         self.setWindowTitle(APP_TITLE)
         self.setWindowIcon(icons.app_icon())
         self.resize(1280, 860)
@@ -153,7 +155,7 @@ class MainWindow(QMainWindow):
         self.banner = QWidget()
         bl = QHBoxLayout(self.banner)
         bl.setContentsMargins(theme.S4, theme.S2, theme.S4, theme.S2)
-        self.banner_text = label("", "warn")
+        self.banner_text = label("", "warn", wrap=True)
         bl.addWidget(self.banner_text, 1)
         self.banner_button = button(tr("Allow access"), "primary", "shield")
         self.banner_button.clicked.connect(self.fix_permissions)
@@ -209,16 +211,16 @@ class MainWindow(QMainWindow):
         self.profile_box.setToolTip(tr("Active profile"))
         self.profile_box.activated.connect(self._profile_chosen)
         lay.addWidget(self.profile_box)
-        self.toast = label("", "dim")
+        self.toast = ElidedLabel("", "dim")
         lay.addWidget(self.toast, 1, Qt.AlignmentFlag.AlignCenter)
-        self.busy = label("", "dim")
+        self.busy = StatusLine("dim", wrap=False)
         lay.addWidget(self.busy)
         self.conn_dot = Dot()
         lay.addWidget(self.conn_dot)
         self.conn_label = label("")
         lay.addWidget(self.conn_label)
         lay.addSpacing(theme.S2)
-        self.clock_label = label("", "dim")
+        self.clock_label = StatusLine("dim", wrap=False)
         lay.addWidget(self.clock_label)
         self.sync_button = button(tr("Sync clock"), "ghost", "clock", tr("Set the screen clock to the system time"))
         self.sync_button.clicked.connect(self.sync_clock)
@@ -363,6 +365,23 @@ class MainWindow(QMainWindow):
 
     def save(self) -> None:
         self.cfg.save()
+        self._cfg_mtime = cfgmod.mtime(self.cfg.path)
+
+    def _reload_if_changed(self) -> None:
+        """The agent switches profiles for games by editing the config; follow it."""
+        m = cfgmod.mtime(self.cfg.path)
+        if m == self._cfg_mtime or self.tasks:      # a running task may still save its result
+            return
+        self._cfg_mtime = m
+        fresh = Config.load(self.cfg.path)
+        if fresh.to_dict() == self.cfg.to_dict():
+            return
+        self.cfg = fresh
+        self.engine.preview_only_profile = self.cfg.profile
+        self.refresh_profiles()
+        for page in self.pages:
+            page.refresh()
+        self.page().on_enter()
 
     # ------------------------------------------------------------ profiles
 
@@ -397,6 +416,7 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------------ device state
 
     def update_connection(self) -> None:
+        self._reload_if_changed()
         state = connection_state()
         if state != self.connection:
             self.connection = state
@@ -414,7 +434,7 @@ class MainWindow(QMainWindow):
             self.conn_label.setText(text)
             self.conn_label.setToolTip(tr("Through the dongle the keyboard only takes the clock and reports its "
                                           "battery. Connect the cable for everything else."))
-            if time.monotonic() - self.battery_at > 30:
+            if time.monotonic() - self.battery_at > 30 and not self.preview_only:
                 self.battery_at = time.monotonic()
                 self.run(self._read_battery, self._battery_read, failed=lambda _: None)
         else:
@@ -453,6 +473,8 @@ class MainWindow(QMainWindow):
         self.update_connection()
 
     def sync_clock(self) -> None:
+        if self.preview_only:
+            return
         slot = self.cfg.settings.clock_slot
 
         def work():
@@ -471,6 +493,8 @@ class MainWindow(QMainWindow):
         self.run(work, done, tr("Syncing the clock…"))
 
     def fix_permissions(self) -> None:
+        if self.preview_only:
+            return
         self.run(permissions.install_rule, lambda _: (self.notify(tr("Access allowed")), self.update_connection()),
                  tr("Waiting for authorisation…"), device=False)
 

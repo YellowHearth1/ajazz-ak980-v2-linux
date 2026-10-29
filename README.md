@@ -76,8 +76,9 @@ make DESTDIR="$DESTDIR" PREFIX=/usr install-data install-systemd   # + install-o
 
 ## First start
 
-1. **Access.** Packages install `/usr/lib/udev/rules.d/60-ajazz-ak980.rules`. Reconnect the keyboard
-   once. Without a package, the app shows *Allow access* (or run `ak980 setup`).
+1. **Access.** Packages install `/usr/lib/udev/rules.d/60-ajazz-ak980.rules`. If the keyboard was
+   already plugged in, reconnect it once or press *Allow access*. Without a package, *Allow access*
+   (or `ak980 setup`) installs the rule.
 2. **Background agent.** It keeps the clock right, runs PC effects, switches profiles and handles
    launcher keys. Packages start it with your desktop session. To run it as a service instead, pick
    it on the *Device* page or:
@@ -131,7 +132,8 @@ installed with the package.
 ## Troubleshooting
 
 **"No access to /dev/hidraw…"** — the udev rule is missing or the keyboard was plugged in before it
-was installed. Run `ak980 setup` (or *Allow access*), then reconnect the keyboard.
+was installed. Run `ak980 setup` (or *Allow access*): it installs the rule when needed and applies it
+to the connected keyboard. Reconnecting the keyboard works too.
 
 **Only the clock works.** The keyboard is in 2.4 GHz or Bluetooth mode. Connect the cable and switch
 the keyboard to wired mode; the vendor's driver has the same limit.
@@ -166,9 +168,9 @@ The wired protocol was reverse engineered in
 [donglover69/ak980-studio](https://github.com/donglover69/ak980-studio) (MIT), and the real-time
 stream comes from [hcode10/OpenRGB-With-AulaF108Pro-support](https://github.com/hcode10/OpenRGB-With-AulaF108Pro-support)
 (the AULA F108 Pro shares the AK980's firmware). This project ports both to Linux, verifies them on
-an AK980 V2 and builds the rest on top. The interface uses Fira Sans and Fira Mono (SIL OFL 1.1).
+an AK980 V2 and builds the rest on top. The interface uses the Ubuntu font family (Ubuntu Font Licence 1.0).
 
 ## License
 
-MIT, see [LICENSE](LICENSE). Bundled fonts: SIL Open Font License, see
-[ak980/data/fonts/OFL.txt](ak980/data/fonts/OFL.txt).
+MIT, see [LICENSE](LICENSE). Bundled fonts: Ubuntu Font Licence 1.0, see
+[ak980/data/fonts/UFL.txt](ak980/data/fonts/UFL.txt).

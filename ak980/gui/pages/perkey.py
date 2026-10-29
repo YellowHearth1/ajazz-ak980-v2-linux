@@ -6,7 +6,7 @@ import colorsys
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
-from PyQt6.QtWidgets import QGridLayout, QHBoxLayout
+from PyQt6.QtWidgets import QGridLayout
 
 from ...i18n import plural, tr
 from ...layout import keys
@@ -52,15 +52,14 @@ class PerKeyPage(Page):
         for i, (text, icon, fn) in enumerate(actions):
             b = button(text, None, icon)
             b.clicked.connect(fn)
-            tools.addWidget(b, i // 3, i % 3)
-        groups = QHBoxLayout()
+            tools.addWidget(b, i // 2, i % 2)
+        groups = QGridLayout()
         groups.setSpacing(theme.S2)
-        for name, members in GROUPS.items():
-            b = button(tr(name), "ghost")
+        for i, (name, members) in enumerate(GROUPS.items()):
+            b = button(tr(name))
             b.setToolTip(tr("Paint {group} with the brush", group=tr(name)))
             b.clicked.connect(lambda _=False, m=members: self.paint_group(m))
-            groups.addWidget(b)
-        groups.addStretch()
+            groups.addWidget(b, i // 2, i % 2)
         form = Form()
         self.gradient_to = ColorChip((40, 90, 255))
         form.add(tr("Gradient to"), self.gradient_to)
@@ -72,7 +71,7 @@ class PerKeyPage(Page):
         write = column(heading(tr("Keyboard")), spacing=theme.S3, stretch=False)
         self.count = label("", "dim")
         write.addWidget(self.count)
-        self.write_button = button(tr("Write colours to keyboard"), "primary", "upload")
+        self.write_button = button(tr("Write to keyboard"), "primary", "upload")
         self.write_button.clicked.connect(self.write)
         write.addWidget(self.write_button)
         write.addWidget(label(tr("The colours are stored in the keyboard and replace the lighting effect. "

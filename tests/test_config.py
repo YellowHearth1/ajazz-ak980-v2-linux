@@ -56,3 +56,44 @@ def test_peek_language(tmp_path):
     assert peek_language(str(path)) == "auto"
     path.write_text(json.dumps({"settings": {"language": "uk"}}))
     assert peek_language(str(path)) == "uk"
+
+
+def test_broken_config_is_kept(tmp_path):
+    path = tmp_path / "config.json"
+    path.write_text("{ not json")
+    c = Config.load(str(path))
+    assert c.profiles and not path.exists()
+    kept = list(tmp_path.glob("config.json.broken-*"))
+    assert len(kept) == 1 and kept[0].read_text() == "{ not json"
+
+
+def test_auto_switch_follows_the_program(tmp_path, monkeypatch):
+    from ak980 import agent
+    monkeypatch.setattr(agent.WiredKeyboard, "find", staticmethod(lambda: None))     # nothing reaches a keyboard
+    c = Config(path=str(tmp_path / "c.json"))
+    main = c.active
+    c.add(Profile(name="Game"))
+    c.add(Profile(name="Work"))
+    c.settings.auto_switch = True
+    c.settings.rules = [Rule("cs2", "Game")]
+    a = agent.Agent()
+    a._auto_switch(c, set())
+    assert c.active == main                    # nothing runs, nothing changes
+    a._auto_switch(c, {"cs2"})
+    assert c.active == "Game"
+    a._auto_switch(c, {"cs2"})
+    a._auto_switch(c, set())
+    assert c.active == main                    # the profile from before comes back
+    c.active = "Work"                          # picked by hand
+    a._auto_switch(c, set())
+    assert c.active == "Work"
+    a._auto_switch(c, {"cs2"})
+    c.active = main                            # the user leaves the game's profile while it runs
+    a._auto_switch(c, {"cs2"})
+    assert c.active == main                    # it is not forced back
+    a._auto_switch(c, set())
+    assert c.active == main                    # nor replaced when the game exits
+    c.settings.default_profile = "Work"
+    a._auto_switch(c, {"cs2"})
+    a._auto_switch(c, set())
+    assert c.active == "Work"                  # an explicit profile for "after the program exits"

@@ -110,6 +110,9 @@ class Agent:
         self.engine = None
         self.keys = None
         self._launchers: dict[int, str] = {}
+        self._wanted: str | None = None          # profile the running programs asked for last time
+        self._for_program: str | None = None     # profile switched to because a program runs
+        self._before_program: str | None = None  # the profile that was active before that
 
     # ------------------------------------------------------------ settings
 
@@ -137,15 +140,30 @@ class Agent:
             except OSError as e:
                 log.warning("cannot apply profile %s: %s", name, e)
 
-    def _auto_switch(self, cfg: cfgmod.Config) -> None:
+    def _auto_switch(self, cfg: cfgmod.Config, running: set[str] | None = None) -> None:
+        """Switches to a program's profile when it starts and back when it exits.
+
+        Only a change in what runs triggers a switch, so a profile picked by hand in between stays.
+        Going back is skipped when the user has moved away from the program's profile.
+        """
         s = cfg.settings
         if not s.auto_switch or not s.rules:
+            self._wanted = self._for_program = self._before_program = None
             return
-        wanted = matching_profile(s, running_processes())
-        if wanted is None:
-            wanted = s.default_profile or None
-        if wanted and wanted != cfg.active:
+        wanted = matching_profile(s, running_processes() if running is None else running)
+        if wanted == self._wanted:
+            return
+        self._wanted = wanted
+        if wanted:
+            if self._for_program is None:
+                self._before_program = cfg.active
+            self._for_program = wanted
             self._switch_to(cfg, wanted)
+        elif self._for_program is not None:
+            back = s.default_profile or self._before_program
+            if back and cfg.active == self._for_program:
+                self._switch_to(cfg, back)
+            self._for_program = self._before_program = None
 
     # ------------------------------------------------------------ launcher keys
 

@@ -10,6 +10,9 @@
 #   build.sh            full build; downloads are cached in build/appimage-cache
 #   build.sh --refresh  reuse the last AppDir, only reinstall this checkout and repack
 set -euo pipefail
+# Where AppImageLauncher is installed, running an AppImage (appimagetool, the Python runtime) goes
+# through its integration dialog; the build runs them directly.
+export APPIMAGELAUNCHER_DISABLE=1
 
 PYVER="${PYVER:-3.12}"
 ARCH="${ARCH:-x86_64}"

@@ -12,7 +12,8 @@ from ...keymap import (HID_KEYS, LAUNCHER_KEYS, LINUX_TO_HID, MACRO_MODE_LABELS,
                        MOD_CTRL, MOD_SHIFT, MOD_WIN, MOUSE_FUNCS, MOUSE_LABELS, KeyAction, key_code, key_name)
 from ...layout import by_index
 from .. import theme
-from ..widgets import Form, KeycapGrid, Segmented, Toggle, button, column, combo, heading, label
+from ..widgets import (ElidedLabel, Form, KeycapGrid, Segmented, StatusLine, Toggle, button, column, combo, heading,
+                       label)
 from . import Page
 
 KINDS = [("default", "Default"), ("key", "Key or shortcut"), ("mouse", "Mouse"), ("media", "Media"),
@@ -66,11 +67,12 @@ class KeysPage(Page):
         self.layer.changed.connect(lambda _: self.refresh())
         top.addWidget(self.layer)
         top.addSpacing(theme.S3)
-        self.hint = label(tr("Click a key on the keyboard above."), "dim")
+        self.hint = ElidedLabel(tr("Click a key on the keyboard above."), "dim")
         top.addWidget(self.hint, 1)
         self.root.addLayout(top)
 
         edit = QVBoxLayout()
+        edit.setContentsMargins(0, 0, 0, 0)
         edit.setSpacing(theme.S3)
         self.key_title = heading(tr("No key selected"))
         edit.addWidget(self.key_title)
@@ -82,7 +84,7 @@ class KeysPage(Page):
         for kind, _ in KINDS:
             self.editor_index[kind] = self.editors.addWidget(self._editor(kind))
         edit.addWidget(self.editors)
-        self.bytes_label = label("", "mono")
+        self.bytes_label = StatusLine("mono")
         edit.addWidget(self.bytes_label)
         edit.addStretch(1)
         self.edit_box = QWidget()
@@ -90,6 +92,7 @@ class KeysPage(Page):
         self.edit_box.setEnabled(False)
 
         side = QVBoxLayout()
+        side.setContentsMargins(0, 0, 0, 0)
         side.setSpacing(theme.S3)
         side.addWidget(heading(tr("Changed keys")))
         self.changed_list = QListWidget()
@@ -100,8 +103,7 @@ class KeysPage(Page):
         self.clear_button = button(tr("Reset key"), "ghost")
         self.clear_button.clicked.connect(self.reset_key)
         row.addWidget(self.clear_button)
-        self.reset_button = button(tr("Reset layer"), "ghost")
-        self.reset_button.setProperty("kind", "danger")
+        self.reset_button = button(tr("Reset layer"), "danger")
         self.reset_button.clicked.connect(self.reset_layer)
         row.addWidget(self.reset_button)
         row.addStretch()
