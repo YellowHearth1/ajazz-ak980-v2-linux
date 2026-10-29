@@ -23,7 +23,7 @@ pub mod paths;
 // pub mod permissions;   // not ported yet
 pub mod profiles;
 pub mod runtime;
-// pub mod service;   // not ported yet
+pub mod service;
 pub mod time;
 
 pub use error::{Error, Result};
