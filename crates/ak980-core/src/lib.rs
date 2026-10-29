@@ -13,7 +13,7 @@ pub mod effects;
 mod error;
 pub mod hid;
 pub mod i18n;
-// pub mod keyinput;   // not ported yet
+pub mod keyinput;
 pub mod keymap;
 pub mod layout;
 pub mod lcd;
