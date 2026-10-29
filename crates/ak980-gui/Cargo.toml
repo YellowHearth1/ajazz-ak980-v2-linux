@@ -20,6 +20,7 @@ iced = { version = "0.14", default-features = false, features = [
     "wgpu", "tiny-skia", "crisp", "canvas", "image-without-codecs", "tokio",
     "linux-theme-detection", "wayland", "x11",
 ] }
+image = { version = "0.25", default-features = false, features = ["png"] }
 rfd = { version = "0.17", default-features = false, features = ["xdg-portal", "wayland"] }
 
 [dev-dependencies]

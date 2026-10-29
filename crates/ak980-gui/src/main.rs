@@ -19,6 +19,10 @@ fn main() -> iced::Result {
         .window(window::Settings {
             size: iced::Size::new(1240.0, 820.0),
             min_size: Some(iced::Size::new(980.0, 640.0)),
+            // Under Wayland the compositor finds the icon from the application id instead
+            icon: image::load_from_memory(include_bytes!("../assets/icon-128.png"))
+                .ok()
+                .and_then(|i| window::icon::from_rgba(i.to_rgba8().into_raw(), 128, 128).ok()),
             platform_specific: window::settings::PlatformSpecific {
                 application_id: ak980_core::APP_ID.to_string(),
                 ..Default::default()
