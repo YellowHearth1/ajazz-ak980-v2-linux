@@ -341,8 +341,11 @@ pub fn dinit_user_disable() {
 
 // ------------------------------------------------------------ system services (root)
 
-/// (template, destination, packaged copy that makes writing unnecessary, mode) per init system.
-pub const SYSTEM_FILES: &[(&str, &[(&str, &str, Option<&str>, u32)])] = &[
+/// (template, destination, packaged copy that makes writing unnecessary, mode)
+pub type SystemFile = (&'static str, &'static str, Option<&'static str>, u32);
+
+/// The files of each init system's service.
+pub const SYSTEM_FILES: &[(&str, &[SystemFile])] = &[
     ("systemd", &[("systemd/ak980d.service", "/etc/systemd/system/ak980d.service",
                    Some("/usr/lib/systemd/system/ak980d.service"), 0o644)]),
     ("openrc", &[("openrc/ak980d", "/etc/init.d/ak980d", None, 0o755)]),
@@ -356,7 +359,7 @@ pub const SYSTEM_FILES: &[(&str, &[(&str, &str, Option<&str>, u32)])] = &[
 pub const INIT_TITLES: [(&str, &str); 5] =
     [("systemd", "systemd"), ("openrc", "OpenRC"), ("dinit", "dinit"), ("runit", "runit"), ("s6", "s6")];
 
-fn system_files(init: &str) -> &'static [(&'static str, &'static str, Option<&'static str>, u32)] {
+fn system_files(init: &str) -> &'static [SystemFile] {
     SYSTEM_FILES.iter().find(|(name, _)| *name == init).map(|(_, files)| *files).unwrap_or(&[])
 }
 

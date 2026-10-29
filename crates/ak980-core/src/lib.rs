@@ -9,7 +9,7 @@ pub mod audio;
 pub mod config;
 pub mod device;
 pub mod effects;
-// pub mod engine;   // not ported yet
+pub mod engine;
 mod error;
 pub mod hid;
 pub mod i18n;

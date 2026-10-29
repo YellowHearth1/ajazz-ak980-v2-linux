@@ -52,7 +52,7 @@ pub fn readable() -> bool {
 /// Calls `callback(hid_usage, pressed)` for every key press and release in raw `input_event`s;
 /// auto-repeat (value 2) and other event types are skipped.
 pub fn parse_events(data: &[u8], callback: &mut dyn FnMut(u8, bool)) {
-    for chunk in data.chunks_exact(EVENT_SIZE) {
+    for chunk in data.as_chunks::<EVENT_SIZE>().0 {
         // SAFETY: the chunk holds exactly one input_event; read_unaligned copes with any alignment
         let ev: libc::input_event = unsafe { std::ptr::read_unaligned(chunk.as_ptr().cast()) };
         if ev.type_ == EV_KEY
