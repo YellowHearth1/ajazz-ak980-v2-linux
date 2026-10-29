@@ -1,7 +1,7 @@
 """Key presses on the AK980, read from its /dev/input event devices.
 
 Used by the reactive lighting effects and by launcher keys (F13–F24 → run a program). Reading
-needs the ``input`` group (most desktop users are in it) or the udev rule's access control list.
+needs the ``input`` group (most desktop users are in it); the app's udev rule does not open them.
 """
 
 from __future__ import annotations

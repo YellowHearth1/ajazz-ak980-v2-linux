@@ -6,6 +6,11 @@ SUBSYSTEM!="hidraw", GOTO="ajazz_ak980_end"
 # The interface number sits on the USB interface, the IDs on its USB device; one rule cannot test both
 ATTRS{idVendor}=="0c45", ATTRS{idProduct}=="8009", ENV{.AJAZZ_AK980}="usb"
 ATTRS{idVendor}=="0c45", ATTRS{idProduct}=="fefe", ENV{.AJAZZ_AK980}="dongle"
+ENV{.AJAZZ_AK980}=="", GOTO="ajazz_ak980_end"
+# Every interface stays root's, as the kernel creates it, unless a line below opens it. udev leaves
+# a node alone when no rule sets its mode or group, so this is what takes back the access the 0.0.1
+# rule gave the keystroke interfaces once the rules are applied again, without replugging.
+MODE="0600", GROUP="root"
 # Cable: interface 2 takes the screen (usage page 0xFF68), interface 3 every command (0xFF13)
 ENV{.AJAZZ_AK980}=="usb", ATTRS{bInterfaceNumber}=="02|03", MODE="0660", GROUP="input", TAG+="uaccess"
 # Dongle: interface 3 takes the battery and clock commands (0xFF60); interface 4 (0xFF59) is only

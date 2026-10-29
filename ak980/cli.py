@@ -410,7 +410,7 @@ def cmd_service(a, cfg) -> None:
 
 def cmd_setup(a, cfg) -> None:
     from . import permissions
-    if permissions.accessible() and not a.force:
+    if permissions.accessible() and not permissions.rule_outdated() and not a.force:
         _say(tr("The keyboard is already accessible."))
         return
     permissions.install_rule()

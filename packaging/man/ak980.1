@@ -80,6 +80,7 @@ system-systemd, system-openrc, system-dinit, system-runit, system-s6.
 .TP
 .B setup
 Install the udev rule that lets your user access the keyboard (asks for your password).
+It also replaces an older copy left in /etc/udev/rules.d, such as the one 0.0.1 wrote.
 .TP
 .B apply
 Send the active profile and the time to the keyboard.
@@ -102,7 +103,7 @@ Copies of every animation uploaded to the screen.
 Settings of the system service (clock_slot, sync_interval_min).
 .TP
 .I /usr/lib/udev/rules.d/60-ajazz-ak980.rules
-Access rule for the keyboard's HID interfaces.
+Access rule: opens the interfaces the app uses and keeps the ones that carry keystrokes root-only.
 .SH EXAMPLES
 .nf
 ak980 time

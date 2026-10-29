@@ -11,8 +11,8 @@ from .service import run_as_root
 
 RULE_NAME = "60-ajazz-ak980.rules"
 RULE_SOURCE = os.path.join(os.path.dirname(__file__), "data", RULE_NAME)
-RULE_LOCATIONS = ("/usr/lib/udev/rules.d/" + RULE_NAME, "/etc/udev/rules.d/" + RULE_NAME,
-                  "/lib/udev/rules.d/" + RULE_NAME)
+ETC_RULE = "/etc/udev/rules.d/" + RULE_NAME
+RULE_LOCATIONS = ("/usr/lib/udev/rules.d/" + RULE_NAME, ETC_RULE, "/lib/udev/rules.d/" + RULE_NAME)
 
 
 def rule_installed() -> bool:
@@ -21,7 +21,23 @@ def rule_installed() -> bool:
 
 def rule_packaged() -> bool:
     """A distribution package ships the rule; a copy in /etc would shadow its future updates."""
-    return any(os.path.exists(p) for p in RULE_LOCATIONS if not p.startswith("/etc/"))
+    return any(os.path.exists(p) for p in RULE_LOCATIONS if p != ETC_RULE)
+
+
+def rule_outdated() -> bool:
+    """udev reads a copy in /etc that is not this version's rule, or that hides the packaged one.
+
+    0.0.1 wrote such a copy without a package, and its rule also opened the keystroke interfaces.
+    """
+    try:
+        with open(ETC_RULE, encoding="utf-8") as f:
+            copy = f.read()
+    except OSError:
+        return False
+    if rule_packaged():
+        return True
+    with open(RULE_SOURCE, encoding="utf-8") as f:
+        return f.read() != copy
 
 
 # The interfaces the app opens (see the rule); the others carry keystrokes and stay closed to users
@@ -47,38 +63,29 @@ def accessible() -> bool | None:
 
 
 def install_rule() -> None:
-    """Puts the rule in /etc unless a package ships it, then applies it to the connected keyboard."""
+    """Makes this version's rule the one udev reads, then applies it to the connected keyboard.
+
+    The rule goes to /etc unless a package ships it; with a package, a copy left in /etc goes away.
+    """
     script = "set -e\n"
     if not rule_packaged():
         with open(RULE_SOURCE, encoding="utf-8") as f:
             rule = f.read()
         script += (
             "mkdir -p /etc/udev/rules.d\n"
-            f"cat > /etc/udev/rules.d/{RULE_NAME} <<'AK980_EOF'\n{rule}AK980_EOF\n"
-            f"chmod 644 /etc/udev/rules.d/{RULE_NAME}\n"
+            f"cat > {ETC_RULE} <<'AK980_EOF'\n{rule}AK980_EOF\n"
+            f"chmod 644 {ETC_RULE}\n"
         )
-    nodes = keyboard_nodes()
-    script += "udevadm control --reload-rules\n" + trigger_command(nodes) + revoke_command(nodes, app_nodes())
+    elif os.path.exists(ETC_RULE):
+        script += f"rm -f {ETC_RULE}\n"
+    script += "udevadm control --reload-rules\n" + trigger_command(keyboard_nodes())
     run_as_root(script)
-
-
-def revoke_command(nodes: list[str], keep: list[str]) -> str:
-    """Puts the keystroke interfaces back the way the kernel creates them (root only, no ACL).
-
-    The rule of 0.0.1 opened them too, and a node that no longer matches keeps its old group, mode
-    and ACL until it is plugged in again.
-    """
-    stale = " ".join(shlex.quote(n) for n in nodes if n not in keep)
-    if not stale:
-        return ""
-    return ("udevadm settle --timeout=5 || true\n"
-            f"chown root:root {stale}\nchmod 0600 {stale}\n"
-            f"if command -v setfacl >/dev/null; then setfacl -b {stale}; fi\n")
 
 
 def trigger_command(nodes: list[str]) -> str:
     """Re-applies the rule to the keyboard's own nodes, with "change" as udev's reload hooks do.
 
+    Every node of the keyboard, so that the keystroke interfaces lose what an older rule gave them.
     An "add" for every hidraw device would tell other programs their devices were plugged in again.
     """
     if not nodes:

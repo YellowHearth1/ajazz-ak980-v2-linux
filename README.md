@@ -81,7 +81,9 @@ make DESTDIR="$DESTDIR" PREFIX=/usr install-data install-systemd   # + install-o
 
 1. **Access.** Packages install `/usr/lib/udev/rules.d/60-ajazz-ak980.rules`. If the keyboard was
    already plugged in, reconnect it once or press *Allow access*. Without a package, *Allow access*
-   (or `ak980 setup`) installs the rule.
+   (or `ak980 setup`) installs the rule. The rule opens only the interfaces the app talks to: screen
+   and commands on the cable, the two vendor interfaces on the receiver. The interfaces that carry
+   what you type stay root's, so other programs cannot read your key presses through them.
 2. **Background agent.** It keeps the clock right, runs PC effects, switches profiles and handles
    launcher keys. Packages start it with your desktop session. To run it as a service instead, pick
    it on the *Device* page or:
@@ -137,6 +139,13 @@ installed with the package.
 **"No access to /dev/hidraw…"** — the udev rule is missing or the keyboard was plugged in before it
 was installed. Run `ak980 setup` (or *Allow access*): it installs the rule when needed and applies it
 to the connected keyboard. Reconnecting the keyboard works too.
+
+**Updating from 0.0.1.** The 0.0.1 rule also opened the interfaces that carry key presses. The new
+one closes them whenever udev applies it: the Arch and Artix packages do that while installing.
+Without a package, run `ak980 setup` once; it replaces the old copy in `/etc/udev/rules.d`. To check,
+`ak980 list` shows which `/dev/hidrawN` is which interface (`if0`…`if4`), and `ls -l /dev/hidraw*`
+should show `crw-------` (root only) on the cable's `if0` and `if1` and the receiver's `if0`–`if2`.
+If one is still open, reconnect the keyboard and its receiver once.
 
 **Only the clock works.** The keyboard is in 2.4 GHz or Bluetooth mode. Connect the cable and switch
 the keyboard to wired mode; the vendor's driver has the same limit.
