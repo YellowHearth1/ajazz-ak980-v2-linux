@@ -100,7 +100,13 @@ mod tests {
         let mut b = InstanceLock::new(&name);
         assert!(!b.acquire(false).unwrap());
         a.release();
-        assert!(!is_held(&name));
+        // Other tests start child processes; between fork and exec a child shares the lock's open
+        // file, so the lock can outlive release() by a moment
+        let freed = (0..200).any(|_| {
+            std::thread::sleep(std::time::Duration::from_millis(5));
+            !is_held(&name)
+        });
+        assert!(freed);
         let _ = std::fs::remove_file(lock_path(&name));
     }
 }
