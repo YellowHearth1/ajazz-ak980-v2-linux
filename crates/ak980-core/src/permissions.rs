@@ -1,6 +1,7 @@
 //! Access to the keyboard without root: the udev rule.
 
 use std::ffi::CString;
+use std::fs;
 use std::path::Path;
 
 use crate::Result;
@@ -10,11 +11,9 @@ use crate::service::{run_as_root, shell_quote};
 
 pub const RULE_NAME: &str = "60-ajazz-ak980.rules";
 pub const RULE: &str = include_str!("../../../ak980/data/60-ajazz-ak980.rules");
-pub const RULE_LOCATIONS: [&str; 3] = [
-    "/usr/lib/udev/rules.d/60-ajazz-ak980.rules",
-    "/etc/udev/rules.d/60-ajazz-ak980.rules",
-    "/lib/udev/rules.d/60-ajazz-ak980.rules",
-];
+pub const ETC_RULE: &str = "/etc/udev/rules.d/60-ajazz-ak980.rules";
+pub const RULE_LOCATIONS: [&str; 3] =
+    ["/usr/lib/udev/rules.d/60-ajazz-ak980.rules", ETC_RULE, "/lib/udev/rules.d/60-ajazz-ak980.rules"];
 
 /// The interfaces the app opens (see the rule); the others carry keystrokes and stay closed to users.
 pub const APP_INTERFACES: [(u16, &[i32]); 2] = [(WIRED_PID, &[2, 3]), (DONGLE_PID, &[3, 4])];
@@ -29,7 +28,21 @@ pub fn rule_installed() -> bool {
 
 /// A distribution package ships the rule; a copy in /etc would shadow its future updates.
 pub fn rule_packaged() -> bool {
-    RULE_LOCATIONS.iter().filter(|p| !p.starts_with("/etc/")).any(|p| Path::new(p).exists())
+    RULE_LOCATIONS.iter().filter(|p| **p != ETC_RULE).any(|p| Path::new(p).exists())
+}
+
+/// udev reads a copy in /etc that is not this version's rule, or that hides the packaged one.
+///
+/// 0.0.1 wrote such a copy without a package, and its rule also opened the keystroke interfaces.
+pub fn rule_outdated() -> bool {
+    rule_outdated_at(Path::new(ETC_RULE), rule_packaged())
+}
+
+pub fn rule_outdated_at(etc_copy: &Path, packaged: bool) -> bool {
+    match fs::read_to_string(etc_copy) {
+        Ok(copy) => packaged || copy != RULE,
+        Err(_) => false,
+    }
 }
 
 /// Every hidraw node of the keyboard and its dongle.
@@ -65,45 +78,33 @@ pub fn accessible() -> Option<bool> {
     Some(nodes.iter().all(|p| read_write(p)))
 }
 
-/// The root script `install_rule` runs: the rule into /etc unless a package ships it, a reload, a
-/// "change" event for the keyboard's nodes, and the keystroke nodes back to root only.
-pub fn install_script(packaged: bool, nodes: &[String], keep: &[String]) -> String {
+/// The root script `install_rule` runs. It makes this version's rule the one udev reads (a copy in
+/// /etc unless a package ships the rule; with a package, a copy left in /etc goes away), reloads
+/// the rules and sends the keyboard's nodes a "change" event, which also closes the keystroke
+/// interfaces an older rule opened.
+pub fn install_script(packaged: bool, etc_copy: bool, nodes: &[String]) -> String {
     let mut script = String::from("set -e\n");
     if !packaged {
         script += "mkdir -p /etc/udev/rules.d\n";
-        script += &format!("cat > /etc/udev/rules.d/{RULE_NAME} <<'AK980_EOF'\n{RULE}AK980_EOF\n");
-        script += &format!("chmod 644 /etc/udev/rules.d/{RULE_NAME}\n");
+        script += &format!("cat > {ETC_RULE} <<'AK980_EOF'\n{RULE}AK980_EOF\n");
+        script += &format!("chmod 644 {ETC_RULE}\n");
+    } else if etc_copy {
+        script += &format!("rm -f {ETC_RULE}\n");
     }
     script += "udevadm control --reload-rules\n";
     script += &trigger_command(nodes);
-    script += &revoke_command(nodes, keep);
     script
 }
 
-/// Puts the rule in place unless a package ships it, then applies it to the connected keyboard.
-/// Asks for the user's password through pkexec.
+/// Installs or repairs the rule and applies it to the connected keyboard. Asks for the user's
+/// password through pkexec.
 pub fn install_rule() -> Result<()> {
-    run_as_root(&install_script(rule_packaged(), &keyboard_nodes(), &app_nodes()))
-}
-
-/// Puts the keystroke interfaces back the way the kernel creates them (root only, no ACL).
-///
-/// The rule of 0.0.1 opened them too, and a node that no longer matches keeps its old group, mode
-/// and ACL until it is plugged in again.
-pub fn revoke_command(nodes: &[String], keep: &[String]) -> String {
-    let stale: Vec<String> = nodes.iter().filter(|n| !keep.contains(n)).map(|n| shell_quote(n)).collect();
-    if stale.is_empty() {
-        return String::new();
-    }
-    let stale = stale.join(" ");
-    format!(
-        "udevadm settle --timeout=5 || true\nchown root:root {stale}\nchmod 0600 {stale}\n\
-         if command -v setfacl >/dev/null; then setfacl -b {stale}; fi\n"
-    )
+    run_as_root(&install_script(rule_packaged(), Path::new(ETC_RULE).exists(), &keyboard_nodes()))
 }
 
 /// Re-applies the rule to the keyboard's own nodes, with "change" as udev's reload hooks do.
 ///
+/// Every node of the keyboard, so that the keystroke interfaces lose what an older rule gave them.
 /// An "add" for every hidraw device would tell other programs their devices were plugged in again.
 pub fn trigger_command(nodes: &[String]) -> String {
     if nodes.is_empty() {
@@ -111,7 +112,10 @@ pub fn trigger_command(nodes: &[String]) -> String {
     }
     let names: Vec<String> = nodes
         .iter()
-        .map(|n| format!("--sysname-match={}", shell_quote(Path::new(n).file_name().map_or(n.as_str(), |f| f.to_str().unwrap_or(n)))))
+        .map(|n| {
+            let name = Path::new(n).file_name().and_then(|f| f.to_str()).unwrap_or(n);
+            format!("--sysname-match={}", shell_quote(name))
+        })
         .collect();
     format!("udevadm trigger --action=change --subsystem-match=hidraw {}\n", names.join(" "))
 }
@@ -124,6 +128,10 @@ mod tests {
         items.iter().map(|s| s.to_string()).collect()
     }
 
+    fn rule_lines() -> Vec<&'static str> {
+        RULE.lines().map(str::trim).filter(|l| !l.is_empty() && !l.starts_with('#')).collect()
+    }
+
     #[test]
     fn trigger_targets_only_the_keyboard() {
         assert_eq!(trigger_command(&[]), "");
@@ -134,30 +142,49 @@ mod tests {
     }
 
     #[test]
-    fn revoke_only_the_keystroke_nodes() {
-        assert_eq!(revoke_command(&v(&["/dev/hidraw3"]), &v(&["/dev/hidraw3"])), "");
-        let cmd = revoke_command(&v(&["/dev/hidraw7", "/dev/hidraw10"]), &v(&["/dev/hidraw10"]));
-        assert!(cmd.contains("chmod 0600 /dev/hidraw7\n") && cmd.ends_with("setfacl -b /dev/hidraw7; fi\n"));
-        assert!(!cmd.contains("hidraw10"));
+    fn rule_opens_only_the_vendor_interfaces() {
+        let lines = rule_lines();
+        let others = lines.iter().position(|l| *l == r#"ENV{.AJAZZ_AK980}=="", GOTO="ajazz_ak980_end""#).unwrap();
+        let closed = lines.iter().position(|l| *l == r#"MODE="0600", GROUP="root""#).unwrap();
+        let opened: Vec<usize> = (0..lines.len()).filter(|i| lines[*i].contains("uaccess")).collect();
+        assert!(others < closed && closed < opened[0] && opened.len() == 2);
+        assert!(lines[opened[0]].contains(r#"ENV{.AJAZZ_AK980}=="usb", ATTRS{bInterfaceNumber}=="02|03""#));
+        assert!(lines[opened[1]].contains(r#"ENV{.AJAZZ_AK980}=="dongle", ATTRS{bInterfaceNumber}=="03|04""#));
     }
 
     #[test]
-    fn rule_opens_only_the_vendor_interfaces() {
-        let rules: Vec<&str> = RULE.lines().filter(|l| l.contains("uaccess") && !l.starts_with('#')).collect();
-        assert_eq!(rules.len(), 2);
-        assert!(rules[0].contains(r#"ENV{.AJAZZ_AK980}=="usb", ATTRS{bInterfaceNumber}=="02|03""#));
-        assert!(rules[1].contains(r#"ENV{.AJAZZ_AK980}=="dongle", ATTRS{bInterfaceNumber}=="03|04""#));
+    fn access_check_follows_the_rule() {
+        for (pid, kind) in [(WIRED_PID, "usb"), (DONGLE_PID, "dongle")] {
+            let want: Vec<String> = app_interfaces(pid).iter().map(|i| format!("{i:02}")).collect();
+            let line = format!(r#"ENV{{.AJAZZ_AK980}}=="{kind}", ATTRS{{bInterfaceNumber}}=="{}""#, want.join("|"));
+            assert!(RULE.contains(&line), "{line}");
+        }
+    }
+
+    #[test]
+    fn outdated_copies() {
+        let dir = std::env::temp_dir().join(format!("ak980-rule-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let etc = dir.join(RULE_NAME);
+        assert!(!rule_outdated_at(&etc, false), "no copy in /etc");
+        fs::write(&etc, RULE).unwrap();
+        assert!(!rule_outdated_at(&etc, false), "this version's rule");
+        assert!(rule_outdated_at(&etc, true), "current, but it hides the package's");
+        fs::write(&etc, "SUBSYSTEM==\"hidraw\", ATTRS{idVendor}==\"0c45\", MODE=\"0660\", TAG+=\"uaccess\"\n").unwrap();
+        assert!(rule_outdated_at(&etc, false), "like 0.0.1's: every interface");
+        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]
     fn install_script_shape() {
-        let nodes = v(&["/dev/hidraw3"]);
-        let plain = install_script(false, &nodes, &nodes);
-        assert!(plain.contains("cat > /etc/udev/rules.d/") && plain.contains(r#"ATTRS{idVendor}=="0c45""#));
-        assert!(plain.ends_with("--sysname-match=hidraw3\n") && !plain.contains("--action=add"));
-        let packaged = install_script(true, &nodes, &nodes);
+        let nodes = v(&["/dev/hidraw3", "/dev/hidraw7"]);
+        let plain = install_script(false, false, &nodes);
+        assert!(plain.contains(&format!("cat > {ETC_RULE} <<")) && plain.contains(r#"ATTRS{idVendor}=="0c45""#));
+        // every node of the keyboard, so that the rule closes its keystroke interfaces again
+        assert!(plain.ends_with("--sysname-match=hidraw3 --sysname-match=hidraw7\n") && !plain.contains("--action=add"));
+        let packaged = install_script(true, false, &nodes);
         assert!(!packaged.contains("/etc/udev") && packaged.contains("udevadm control --reload-rules"));
-        let revoking = install_script(true, &v(&["/dev/hidraw7", "/dev/hidraw10"]), &v(&["/dev/hidraw10"]));
-        assert!(revoking.contains("chmod 0600 /dev/hidraw7"));
+        let leftover = install_script(true, true, &nodes);
+        assert!(leftover.starts_with(&format!("set -e\nrm -f {ETC_RULE}\nudevadm control --reload-rules\n")));
     }
 }
