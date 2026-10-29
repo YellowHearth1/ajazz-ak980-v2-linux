@@ -1,0 +1,22 @@
+[workspace]
+members = ["crates/ak980-core"]   # ak980 (CLI) and ak980-gui join once they have code
+resolver = "3"
+
+[workspace.package]
+version = "0.0.2"
+edition = "2024"
+rust-version = "1.88"
+license = "MIT"
+authors = ["yellowhearth1"]
+repository = "https://github.com/yellowhearth1/ajazz-ak980-v2-linux"
+
+[workspace.dependencies]
+ak980-core = { path = "crates/ak980-core" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+libc = "0.2"
+log = "0.4"
+
+[profile.release]
+lto = "thin"
+strip = true

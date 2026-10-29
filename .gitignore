@@ -9,3 +9,6 @@ __pycache__/
 *.pkg.tar.*
 *.AppImage
 .pytest_cache/
+
+# Rust build output (can grow to many GB; `cargo clean` after work)
+target/
