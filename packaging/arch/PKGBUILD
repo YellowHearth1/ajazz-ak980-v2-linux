@@ -20,7 +20,7 @@ makedepends=(python-build python-installer python-setuptools python-wheel)
 checkdepends=(python-pytest python-pyqt6 python-pillow python-numpy qt6-svg)
 source=("$pkgbase-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
 # Run updpkgsums after tagging a release; the tarball GitHub serves is the one that counts.
-sha256sums=('SKIP')
+sha256sums=('e9dcbb06760d694098a1f5220633adbcc2740308de54b91ebeb2be22682c8ce3')
 
 build() {
   cd "$pkgbase-$pkgver"

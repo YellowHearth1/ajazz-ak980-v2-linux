@@ -15,7 +15,7 @@ pkgbase = ajazz-ak980-v2-linux
 	makedepends = python-setuptools
 	makedepends = python-wheel
 	source = ajazz-ak980-v2-linux-0.0.1.tar.gz::https://github.com/yellowhearth1/ajazz-ak980-v2-linux/archive/refs/tags/v0.0.1.tar.gz
-	sha256sums = SKIP
+	sha256sums = e9dcbb06760d694098a1f5220633adbcc2740308de54b91ebeb2be22682c8ce3
 
 pkgname = ajazz-ak980-v2-linux
 	install = ajazz-ak980-v2-linux.install
