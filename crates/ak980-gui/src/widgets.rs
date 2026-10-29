@@ -170,7 +170,8 @@ pub const SWATCHES: [[u8; 3]; 12] = [
     [0x5B, 0xD0, 0x4F], [0xFF, 0xFF, 0xFF],
 ];
 
-/// Swatches, a hex field and hue/saturation/brightness sliders. `id` keys the hex field's draft.
+/// Swatches, a hex field and hue and saturation sliders (how bright is set where it applies).
+/// `id` keys the hex field's draft.
 pub fn color_picker<'a>(
     id: String,
     current: [u8; 3],
@@ -185,7 +186,6 @@ pub fn color_picker<'a>(
     let (h, s, v) = to_hsv(current);
     let pick_h = on_pick.clone();
     let pick_s = on_pick.clone();
-    let pick_v = on_pick.clone();
     let hex_value = draft.cloned().unwrap_or_else(|| html(current));
     let hex = text_input("#RRGGBB", &hex_value)
         .on_input({
@@ -207,8 +207,6 @@ pub fn color_picker<'a>(
         slider_row(tr("Hue"), slider(0.0..=359.0, h, move |x| pick_h(from_hsv(x, s, v))).step(1.0_f32).width(220)
             .style(theme::slider_style).into()),
         slider_row(tr("Saturation"), slider(0.0..=1.0, s, move |x| pick_s(from_hsv(h, x, v))).step(0.01_f32).width(220)
-            .style(theme::slider_style).into()),
-        slider_row(tr("Brightness"), slider(0.0..=1.0, v, move |x| pick_v(from_hsv(h, s, x))).step(0.01_f32).width(220)
             .style(theme::slider_style).into()),
     ]
     .spacing(10)

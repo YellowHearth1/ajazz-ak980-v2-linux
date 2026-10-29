@@ -135,6 +135,10 @@ pub fn update(app: &mut App, msg: Msg) -> Task<Message> {
 
 fn editor<'a>(app: &'a App, m: &'a Macro) -> Element<'a, Message> {
     let mut steps = column![].spacing(4);
+    if !m.steps.is_empty() {
+        steps = steps.push(row![iced::widget::space().width(Fill), caption(tr("Then wait, ms")).width(70),
+                                iced::widget::space().width(96)].spacing(8));
+    }
     for (n, s) in m.steps.iter().enumerate() {
         let id = format!("delay:{n}");
         let value = app.drafts.get(&id).cloned().unwrap_or_else(|| s.delay.to_string());
@@ -143,7 +147,6 @@ fn editor<'a>(app: &'a App, m: &'a Macro) -> Element<'a, Message> {
             row![
                 text(format!("{:>3}", n + 1)).font(fonts::MONO).size(theme::SMALL).width(30),
                 text(format!("{verb} {}", s.target())).size(theme::TEXT).width(Fill),
-                caption(tr("Then wait, ms")),
                 text_input("10", &value).on_input(move |t| Message::Draft(id.clone(), t)).width(70).padding(4)
                     .style(theme::input).font(fonts::MONO),
                 button(text("↑")).style(theme::flat).padding([2, 8]).on_press_maybe((n > 0).then(|| wrap(Msg::Up(n)))),

@@ -48,6 +48,8 @@ pub struct Status {
     pub battery: Option<Option<u8>>,
     pub access: Option<bool>,
     pub agent: bool,
+    /// The 2.4 GHz receiver is plugged in (also while the keyboard is on the cable).
+    pub receiver: bool,
     pub config_mtime: Option<SystemTime>,
 }
 
@@ -98,6 +100,7 @@ fn poll_status(read_battery: bool) -> Status {
         battery,
         access: permissions::accessible(),
         agent: runtime::agent_running(),
+        receiver: device::receiver_usb_dir().is_some(),
         config_mtime: config::mtime(&paths::config_path()),
     }
 }

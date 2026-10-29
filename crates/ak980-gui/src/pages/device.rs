@@ -154,7 +154,7 @@ pub fn view(app: &App) -> Element<'_, Message> {
         Some(true) => setting(tr("Your user can use the keyboard"), None, text("")),
         None => setting(tr("Keyboard not connected"), None, text("")),
     });
-    if st.link == Some(Link::Dongle) || device::receiver_usb_dir().is_some() {
+    if st.link == Some(Link::Dongle) || st.receiver {
         connection.push(setting(
             tr("Reconnect the receiver"),
             Some(tr("If keys stop arriving over 2.4 GHz: the PC drops the receiver and finds it again, as if it had been plugged in anew. Asks for your password.")),

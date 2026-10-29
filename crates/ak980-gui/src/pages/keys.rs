@@ -148,7 +148,9 @@ fn editor(app: &App) -> Element<'_, Message> {
         (ActionKind::Off, tr("Disabled")),
     ];
     let mut rows = vec![
-        setting(tr!("Key {name}", name = key_name(key)), None, segmented(kinds, d.kind, |k| wrap(Msg::Kind(k)))),
+        column![widgets::heading(tr!("Key {name}", name = key_name(key))), segmented(kinds, d.kind, |k| wrap(Msg::Kind(k)))]
+            .spacing(10)
+            .into(),
     ];
     let pick = |items: Vec<Choice<u8>>, current: u8, f: fn(Choice<u8>) -> Msg| {
         let cur = items.iter().find(|c| c.value == current).cloned();

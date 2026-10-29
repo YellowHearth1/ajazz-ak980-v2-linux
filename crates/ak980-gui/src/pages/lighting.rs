@@ -232,8 +232,13 @@ fn firmware_preview(app: &App) -> BTreeMap<u8, Color> {
     let k = if m.has(CAP_BRIGHTNESS) { l.brightness as f32 / MAX_LEVEL as f32 } else { 1.0 };
     let (leds, pos) = layout::positions();
     let rainbow = l.rainbow || !m.has(CAP_COLOR);
+    // "Single on" lights only the key being pressed: show it on the two home-row keys
+    let only: Option<Vec<u8>> = (l.mode == 2).then(|| {
+        ["F", "J"].iter().filter_map(|n| layout::find_key(n).ok()).map(|k| k.index).collect()
+    });
     leds.iter()
         .zip(pos)
+        .filter(|(led, _)| only.as_ref().is_none_or(|o| o.contains(led)))
         .map(|(led, p)| {
             let c = if rainbow {
                 effects::hsv(p[0] * 0.9, 1.0, 1.0)

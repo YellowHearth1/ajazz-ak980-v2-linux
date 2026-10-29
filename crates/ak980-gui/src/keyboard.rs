@@ -203,11 +203,12 @@ impl<Message> Keyboard<'_, Message> {
         };
         let led = self.leds.get(&key.index).copied().filter(|c| led_on(*c));
 
-        // Light leaking between the caps
+        // Light leaking out from under the cap: the LEDs face south and the caps are opaque
         if let Some(c) = led {
-            let g = 2.6 * s;
-            let glow = Path::rounded_rectangle(Point::new(x - g, y - g), Size::new(w + 2.0 * g, h + 2.0 * g), (6.0 * s).into());
-            frame.fill(&glow, theme::alpha(c, 0.85));
+            for (g, a) in [(2.0 * s, 0.28), (1.0 * s, 0.5)] {
+                let glow = Path::rounded_rectangle(Point::new(x - g, y - g), Size::new(w + 2.0 * g, h + 2.0 * g), (5.5 * s).into());
+                frame.fill(&glow, theme::alpha(c, a));
+            }
         }
         // The cap: its sides, then the top surface set back from the edges as on a sculpted cap
         let inset = 1.2 * s;
@@ -219,15 +220,12 @@ impl<Message> Keyboard<'_, Message> {
         let top = Path::rounded_rectangle(top_pos, top_size, (3.5 * s).into());
         frame.fill(&top, cap);
 
-        // Legends: shine-through takes the LED colour
-        let ink = match led {
-            Some(c) => mix(legend, c, 0.7),
-            None => legend,
-        };
+        // Legends are printed on the caps (no shine-through on this keyboard): characters large,
+        // words like Shift and the F-keys small, as on the real caps
+        let ink = legend;
         let (upper, lower) = legends(&key.label);
-        let single = lower.is_empty();
-        let short = upper.chars().count() <= 2;
-        let size = if !single || short { 10.5 * s } else { 7.4 * s };
+        let large = !lower.is_empty() || upper.chars().count() == 1;
+        let size = if large { 10.5 * s } else { 8.2 * s };
         let pad = 3.6 * s;
         let text = |content: String, p: Point, size: f32| Text {
             content,
