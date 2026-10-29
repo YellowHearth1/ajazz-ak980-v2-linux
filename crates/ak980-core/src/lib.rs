@@ -20,7 +20,7 @@ pub mod lcd;
 pub mod lighting;
 pub mod macros;
 pub mod paths;
-// pub mod permissions;   // not ported yet
+pub mod permissions;
 pub mod profiles;
 pub mod runtime;
 pub mod service;
