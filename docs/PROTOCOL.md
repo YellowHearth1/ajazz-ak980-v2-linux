@@ -21,7 +21,11 @@ from [hcode10/OpenRGB-With-AulaF108Pro-support](https://github.com/hcode10/OpenR
 | dongle | `0c45:fefe` | 4 | `0xFF59/0x61` | 65-byte output and input | unused |
 
 On Linux each interface is a `/dev/hidrawN`; `ak980 list` prints them. Feature reports go through
-`HIDIOCSFEATURE`/`HIDIOCGFEATURE`, output reports through `write()`.
+`HIDIOCSFEATURE`/`HIDIOCGFEATURE`, output reports through `write()`. The udev rule
+(`ak980/data/60-ajazz-ak980.rules`) gives the user the cable's interfaces 2 and 3 and the dongle's 3
+and 4, matched by `bInterfaceNumber`, and sets every other interface of both to root-only: those
+carry keystrokes. Since udev leaves a node alone when no rule sets its mode or group, that also
+takes back what the 0.0.1 rule gave them as soon as the rules are applied again.
 
 In 2.4 GHz mode the keyboard's own USB interfaces disappear (the cable only charges), so the dongle
 is the only way to reach it. The vendor driver does not configure the keyboard over the dongle either.

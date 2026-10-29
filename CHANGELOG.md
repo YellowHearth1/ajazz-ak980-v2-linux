@@ -10,8 +10,10 @@
   the PC failed.
 - Security: the udev rule opens only the interfaces the app uses (screen and commands on the cable,
   3 and 4 on the receiver). It used to open the keystroke interfaces too, which let any program of
-  the user read raw key presses past the Wayland compositor. Installing the rule from the app also
-  closes them on a keyboard that is already plugged in.
+  the user read raw key presses past the Wayland compositor. The rule now sets those interfaces back
+  to root-only whenever udev applies it, so an update closes them on a keyboard that stays plugged
+  in: the Arch package does it while installing, and `ak980 setup` replaces a copy of the 0.0.1 rule
+  left in `/etc/udev/rules.d`.
 
 ## 0.0.1 — 2026-10-29
 
