@@ -39,5 +39,6 @@ jobs:
           make dist
           cp dist/*.tar.gz packaging/arch/
           chown -R builder .
-          su builder -c "cd packaging/arch && makepkg --noconfirm -f"
+          # This commit's tarball, not the release archive the pinned checksum is for
+          su builder -c "cd packaging/arch && makepkg --noconfirm -f --skipchecksums"
           ls -l packaging/arch/*.pkg.tar.zst

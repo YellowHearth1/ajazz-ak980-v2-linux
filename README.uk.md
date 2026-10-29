@@ -40,14 +40,18 @@ Windows. Ця програма вміє все, що вміє він, і роб�
 
 ```bash
 git clone https://github.com/yellowhearth1/ajazz-ak980-v2-linux
-cd ajazz-ak980-v2-linux
-make dist && cp dist/*.tar.gz packaging/arch/
-cd packaging/arch && makepkg -si
+cd ajazz-ak980-v2-linux/packaging/arch
+makepkg -si
 ```
 
-`makepkg -si` збирає й встановлює `ajazz-ak980-v2-linux`. PKGBUILD зроблено як спліт-пакет у стилі
-Artix: якщо потрібна системна служба, поставте поруч пакет для своєї init-системи:
-`ajazz-ak980-v2-linux-dinit`, `-openrc`, `-runit` або `-s6` (юніти systemd лежать в основному пакеті).
+`makepkg -si` завантажує реліз, указаний у PKGBUILD, перевіряє його контрольну суму, збирає й
+встановлює `ajazz-ak980-v2-linux`. Щоб зібрати саме цю копію репозиторію, спершу виконайте
+`make dist` і скопіюйте `dist/*.tar.gz` у `packaging/arch`, а тоді `makepkg -si --skipchecksums`
+(контрольна сума належить релізу).
+
+PKGBUILD зроблено як спліт-пакет у стилі Artix: якщо потрібна системна служба, поставте поруч пакет
+для своєї init-системи: `ajazz-ak980-v2-linux-dinit`, `-openrc`, `-runit` або `-s6` (юніти systemd
+лежать в основному пакеті).
 
 ### AppImage (будь-який дистрибутив)
 

@@ -40,15 +40,18 @@ the keyboard, so what you see is what the keys show.
 
 ```bash
 git clone https://github.com/yellowhearth1/ajazz-ak980-v2-linux
-cd ajazz-ak980-v2-linux
-make dist && cp dist/*.tar.gz packaging/arch/
-cd packaging/arch && makepkg -si
+cd ajazz-ak980-v2-linux/packaging/arch
+makepkg -si
 ```
 
-`makepkg -si` builds and installs `ajazz-ak980-v2-linux`. The PKGBUILD is a split package in the
-Artix style; install the service package for your init system next to it if you want a system
-service: `ajazz-ak980-v2-linux-dinit`, `-openrc`, `-runit` or `-s6` (the systemd units are in the
-main package).
+`makepkg -si` downloads the release the PKGBUILD names, checks its checksum, then builds and installs
+`ajazz-ak980-v2-linux`. To build the checkout itself instead, run `make dist` and copy
+`dist/*.tar.gz` into `packaging/arch` first, then `makepkg -si --skipchecksums` (the checksum is
+the release's).
+
+The PKGBUILD is a split package in the Artix style; install the service package for your init
+system next to it if you want a system service: `ajazz-ak980-v2-linux-dinit`, `-openrc`, `-runit`
+or `-s6` (the systemd units are in the main package).
 
 ### AppImage (any distribution)
 
