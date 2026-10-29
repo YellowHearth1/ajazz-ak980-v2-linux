@@ -145,6 +145,24 @@ def effect_frames(leds, pos) -> list[dict]:
     return out
 
 
+def audio_signals() -> list[np.ndarray]:
+    """Fixed windows for the analyser: a tone, two tones, silence, a loud tone (a beat)."""
+    n = np.arange(1024, dtype=np.float64)
+    tone = lambda f, a: (a * np.sin(2 * np.pi * f * n / 48000)).astype(np.float32)  # noqa: E731
+    return [tone(1000, 0.5), tone(100, 0.3) + tone(5000, 0.2), np.zeros(1024, np.float32), tone(440, 0.9)]
+
+
+def audio_reference() -> list[dict]:
+    from ak980.audio import AudioMeter
+    m = AudioMeter()
+    out = []
+    for samples in audio_signals():
+        m._analyse(samples)
+        out.append({"bands": [float(x) for x in m.bands], "level": float(m.level), "beat": bool(m.beat)})
+        m.beat = False
+    return out
+
+
 def main() -> int:
     profile = parity_profile()
     cfg = Config(path=os.devnull)
@@ -195,6 +213,7 @@ def main() -> int:
         "ops": ops,
         "screen": screen,
         "effects": effect_frames(leds, pos),
+        "audio": audio_reference(),
     }
     with open(OUT, "w", encoding="utf-8") as f:
         json.dump(golden, f, ensure_ascii=False, indent=1)

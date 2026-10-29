@@ -5,7 +5,7 @@
 //! remapping, macros, profiles and keyboard options. `docs/PROTOCOL.md` documents every command.
 
 // pub mod agent;   // not ported yet
-// pub mod audio;   // not ported yet
+pub mod audio;
 pub mod config;
 pub mod device;
 pub mod effects;

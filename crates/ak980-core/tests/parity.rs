@@ -266,3 +266,28 @@ fn deterministic_effects_match_python() {
     }
     assert!(failures.is_empty(), "{}", failures.join("\n"));
 }
+
+#[test]
+fn audio_analysis_matches_python() {
+    let g = golden();
+    let tone = |f: f64, amp: f64| -> Vec<f32> {
+        (0..1024).map(|n| (amp * (2.0 * std::f64::consts::PI * f * n as f64 / 48000.0).sin()) as f32).collect()
+    };
+    let two: Vec<f32> = tone(100.0, 0.3).iter().zip(tone(5000.0, 0.2)).map(|(a, b)| a + b).collect();
+    let signals = [tone(1000.0, 0.5), two, vec![0.0; 1024], tone(440.0, 0.9)];
+    let mut a = ak980_core::audio::Analyser::new(16);
+    let mut failures = Vec::new();
+    for (i, (samples, want)) in signals.iter().zip(g["audio"].as_array().unwrap()).enumerate() {
+        a.analyse(samples);
+        let bands: Vec<f64> = want["bands"].as_array().unwrap().iter().map(|v| v.as_f64().unwrap()).collect();
+        let worst = a.bands.iter().zip(&bands).map(|(x, y)| (*x as f64 - y).abs()).fold(0.0, f64::max);
+        if worst > 2e-3 {
+            failures.push(format!("window {i}: bands off by {worst:.5}\n  python {bands:?}\n  rust   {:?}", a.bands));
+        }
+        if (a.level as f64 - want["level"].as_f64().unwrap()).abs() > 2e-3 || a.beat != want["beat"].as_bool().unwrap() {
+            failures.push(format!("window {i}: level/beat {} {} vs python {} {}", a.level, a.beat, want["level"], want["beat"]));
+        }
+        a.beat = false;
+    }
+    assert!(failures.is_empty(), "{}", failures.join("\n"));
+}
