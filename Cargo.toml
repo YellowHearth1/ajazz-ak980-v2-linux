@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/ak980-core"]   # ak980 (CLI) and ak980-gui join once they have code
+members = ["crates/ak980-core", "crates/ak980"]   # ak980-gui joins once it has code
 resolver = "3"
 
 [workspace.package]

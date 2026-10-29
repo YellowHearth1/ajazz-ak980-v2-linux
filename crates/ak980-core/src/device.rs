@@ -507,6 +507,18 @@ pub fn connection_state() -> Option<Link> {
     }
 }
 
+/// The receiver's USB device in sysfs (`/sys/devices/.../1-1.2`), when it is plugged in.
+pub fn receiver_usb_dir() -> Option<std::path::PathBuf> {
+    hid::enumerate(Some(VENDOR_ID), Some(DONGLE_PID)).iter().find_map(|d| hid::usb_device_dir(&d.path))
+}
+
+/// Root script that makes the kernel drop the receiver and set it up again, as if it had been
+/// unplugged and plugged back in: the USB device's `authorized` switch, off and on.
+pub fn reconnect_script(usb_dir: &std::path::Path) -> String {
+    let switch = crate::service::shell_quote(&usb_dir.join("authorized").to_string_lossy());
+    format!("set -e\necho 0 > {switch}\nsleep 1\necho 1 > {switch}\n")
+}
+
 pub enum AnyKeyboard {
     Wired(WiredKeyboard),
     Dongle(Dongle),
@@ -707,6 +719,13 @@ pub(crate) mod tests {
         let pages = sent[1][8] as usize;
         assert_eq!(sent.len(), 2 + pages + 1);
         assert_eq!(op(sent.last().unwrap()), (4, 0x02));
+    }
+
+    #[test]
+    fn reconnect_switches_the_receiver_off_and_on() {
+        let s = reconnect_script(std::path::Path::new("/sys/devices/pci0000:00/usb1/1-1/1-1.2"));
+        assert_eq!(s, "set -e\necho 0 > /sys/devices/pci0000:00/usb1/1-1/1-1.2/authorized\nsleep 1\n\
+                       echo 1 > /sys/devices/pci0000:00/usb1/1-1/1-1.2/authorized\n");
     }
 
     #[test]
