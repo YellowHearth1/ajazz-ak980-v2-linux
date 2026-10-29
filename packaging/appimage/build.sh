@@ -37,7 +37,9 @@ else
     cd "$work"
     echo "==> Python $PYVER runtime"
     if [ ! -f "$cache/python-$PYVER-$ARCH.AppImage" ]; then
-        url="$(curl -fsSL "https://api.github.com/repos/niess/python-appimage/releases/tags/python$PYVER" |
+        auth=()      # anonymous API calls from shared CI runners run into the rate limit
+        [ -n "${GITHUB_TOKEN:-}" ] && auth=(-H "Authorization: Bearer $GITHUB_TOKEN")
+        url="$(curl -fsSL "${auth[@]}" "https://api.github.com/repos/niess/python-appimage/releases/tags/python$PYVER" |
                python3 -c "import json,sys; print(next(a['browser_download_url'] for a in json.load(sys.stdin)['assets'] if a['name'].endswith('manylinux2014_$ARCH.AppImage')))")"
         curl -fL --retry 3 -o "$cache/python-$PYVER-$ARCH.AppImage" "$url"
     fi
