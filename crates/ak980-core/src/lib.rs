@@ -4,7 +4,7 @@
 //! lighting (firmware effects, per-key colours, real-time effects computed on the PC), key
 //! remapping, macros, profiles and keyboard options. `docs/PROTOCOL.md` documents every command.
 
-// pub mod agent;   // not ported yet
+pub mod agent;
 pub mod audio;
 pub mod config;
 pub mod device;
