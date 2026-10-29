@@ -161,6 +161,12 @@ last byte. The reply repeats the first three command bytes. The keyboard only an
 The vendor driver also sends screen data in 28-byte chunks after a `7F 03 00 SLOT COUNT24` header
 over the dongle; the app does not implement it because the chunk layout is not settled.
 
+The dongle (`0c45:fefe`) has five HID interfaces: 0 keyboard, 1 mouse, 2 consumer, system and NKRO
+keyboard, 3 vendor page `FF60` (the commands above) and 4 vendor page `FF59` (65-byte reports, unused).
+Linux reads interfaces 3 and 4 only while a program has their hidraw node open. With both opened and
+nothing sent, the dongle delivered no reports in 20 s and nothing was waiting, so it does not stall
+when the host leaves those endpoints unread (some receivers do and need `HID_QUIRK_ALWAYS_POLL`).
+
 ## What has been verified
 
 | Command | On an AK980 V2 by this project | Elsewhere |
@@ -171,8 +177,8 @@ over the dongle; the app does not implement it because the chunk layout is not s
 | lighting effects (`13`) | sent and acknowledged, 2026-10-28 | ak980-studio |
 | per-key colours, options, key layers, macros | not on this unit | ak980-studio on an AK980 V2 |
 | colour read-back (`F5`) | answers, but the table does not follow animated effects | ak980-studio on the F108 Pro |
-| dongle battery | not yet | ak980-studio |
-| dongle clock | not yet | taken from the vendor driver |
+| dongle battery | yes, 2026-10-29: `20 01 00 64` (100 %); about 120 ms for the first request after idle, 13 ms after | ak980-studio |
+| dongle clock | yes, 2026-10-29: a test time sent over the dongle showed on the screen; the agent syncs on its own when the keyboard switches to 2.4 GHz | taken from the vendor driver |
 | logo light | not addressable | |
 
 If you can test a line marked "not yet", please open an issue with what you saw.
