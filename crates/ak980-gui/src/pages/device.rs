@@ -6,7 +6,7 @@ use ak980_core::i18n::{self, tr, LANGUAGES};
 use ak980_core::lighting::SLEEP_CHOICES;
 use ak980_core::service::{self, Method};
 use ak980_core::{paths, permissions, tr};
-use iced::widget::{button, column, container, pick_list, row, space, text, toggler, tooltip};
+use iced::widget::{button, column, container, pick_list, row, space, text, toggler};
 use iced::{Alignment, Element, Fill, Task};
 
 use crate::app::{blocking, App, Message};
@@ -299,10 +299,7 @@ fn accent_swatches(app: &App) -> Element<'_, Message> {
         let color = theme::roles_for(&s.theme, id, &s.colorway, app.system_dark).accent;
         let chip = container(space()).width(22).height(22).style(theme::swatch(color, s.accent == id));
         let pick = button(chip).padding(0).style(theme::flat).on_press(wrap(Msg::Accent(id)));
-        swatches = swatches.push(
-            tooltip(pick, container(text(tr(name)).size(theme::SMALL)).padding([4, 8]).style(theme::card),
-                    tooltip::Position::Bottom),
-        );
+        swatches = swatches.push(widgets::hint(pick, tr(name)));
     }
     swatches.into()
 }

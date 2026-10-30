@@ -1,10 +1,7 @@
 //! Macros: the keyboard's macro memory, edited step by step.
 
-use std::collections::BTreeMap;
-
 use ak980_core::device::WiredKeyboard;
 use ak980_core::i18n::{plural, tr};
-use ak980_core::keymap::KeyAction;
 use ak980_core::keymap::hid_keys;
 use ak980_core::macros::{self, Macro, MacroStep, StepAction, BUDGET_BYTES, MAX_MACROS, MIN_DELAY, MOUSE_BUTTONS};
 use ak980_core::tr;
@@ -22,18 +19,13 @@ pub struct State {
     pub key: Option<Choice<u8>>,
     pub button: Option<Choice<u8>>,
     pub text: String,
-    undo: Option<Deleted>,
 }
-
-/// What a deletion changed, for Undo: the profile, its macros and both key layers before it.
-type Deleted = (String, Vec<Macro>, BTreeMap<u8, KeyAction>, BTreeMap<u8, KeyAction>);
 
 #[derive(Debug, Clone)]
 pub enum Msg {
     Select(usize),
     New,
     Delete,
-    Undo,
     Name(String),
     PickKey(Choice<u8>),
     AddKey,
@@ -69,7 +61,6 @@ pub fn update(app: &mut App, msg: Msg) -> Task<Message> {
             return Task::none();
         }
         Msg::New => {
-            app.macros.undo = None; // restoring the old list would take the new macro away again
             let p = app.cfg.profile_mut();
             if p.macros.len() < MAX_MACROS {
                 let name = tr!("Macro {n}", n = p.macros.len() + 1);
@@ -79,23 +70,16 @@ pub fn update(app: &mut App, msg: Msg) -> Task<Message> {
         }
         Msg::Delete => {
             let Some(i) = sel else { return Task::none() };
-            let p = app.cfg.profile_mut();
-            let before = (p.name.clone(), p.macros.clone(), p.keymap_top.clone(), p.keymap_fn.clone());
-            let Some((removed, reset)) = p.remove_macro(i) else { return Task::none() };
-            app.macros.undo = Some(before);
+            let Some(name) = app.cfg.profile().macros.get(i).map(|m| m.name.clone()) else { return Task::none() };
+            app.checkpoint(tr!("Macro “{name}” deleted", name = name));
+            let Some((_, reset)) = app.cfg.profile_mut().remove_macro(i) else { return Task::none() };
             app.macros.selected = None;
-            let mut text = tr!("Macro “{name}” deleted. The macros after it moved up by one.", name = removed.name);
+            let mut text = tr("The macros after it moved up by one.");
             if reset > 0 {
                 text = format!("{text} {}", plural(reset as i64, "{n} key that played it does what is printed on it again.",
                                                    "{n} keys that played it do what is printed on them again."));
             }
             app.notify(text, false);
-        }
-        Msg::Undo => {
-            let Some((name, macros, top, fn_layer)) = app.macros.undo.take() else { return Task::none() };
-            if let Some(p) = app.cfg.get_mut(&name) {
-                (p.macros, p.keymap_top, p.keymap_fn) = (macros, top, fn_layer);
-            }
         }
         Msg::PickKey(k) => {
             app.macros.key = Some(k);
@@ -119,7 +103,6 @@ pub fn update(app: &mut App, msg: Msg) -> Task<Message> {
         }
         other => {
             let Some(i) = sel else { return Task::none() };
-            app.macros.undo = None;
             let (key, button_choice, typed) = (app.macros.key.clone(), app.macros.button.clone(), app.macros.text.clone());
             let Some(m) = app.cfg.profile_mut().macros.get_mut(i) else { return Task::none() };
             match other {
@@ -170,10 +153,12 @@ fn editor<'a>(app: &'a App, m: &'a Macro) -> Element<'a, Message> {
                 text(format!("{verb} {}", s.target())).size(theme::TEXT).width(Fill),
                 text_input("10", &value).on_input(move |t| Message::Draft(id.clone(), t)).width(70).padding(4)
                     .style(theme::input).font(fonts::MONO),
-                button(text("↑")).style(theme::flat).padding([2, 8]).on_press_maybe((n > 0).then(|| wrap(Msg::Up(n)))),
-                button(text("↓")).style(theme::flat).padding([2, 8])
-                    .on_press_maybe((n + 1 < m.steps.len()).then(|| wrap(Msg::Down(n)))),
-                button(text("×")).style(theme::flat).padding([2, 8]).on_press(wrap(Msg::Remove(n))),
+                widgets::hint(button(text("↑")).style(theme::flat).padding([2, 8])
+                    .on_press_maybe((n > 0).then(|| wrap(Msg::Up(n)))), tr("Move up")),
+                widgets::hint(button(text("↓")).style(theme::flat).padding([2, 8])
+                    .on_press_maybe((n + 1 < m.steps.len()).then(|| wrap(Msg::Down(n)))), tr("Move down")),
+                widgets::hint(button(text("×")).style(theme::flat).padding([2, 8]).on_press(wrap(Msg::Remove(n))),
+                              tr("Remove step")),
             ]
             .spacing(8)
             .align_y(Alignment::Center),
@@ -242,14 +227,9 @@ pub fn view(app: &App) -> Element<'_, Message> {
         progress_bar(0.0..=BUDGET_BYTES as f32, used as f32).style(theme::progress).girth(6),
     ]
     .spacing(6);
-    let mut buttons = row![widgets::secondary_button(tr("New macro"), (p.macros.len() < MAX_MACROS).then(|| wrap(Msg::New)))]
-        .spacing(8);
-    if app.macros.undo.as_ref().is_some_and(|(name, ..)| *name == p.name) {
-        buttons = buttons.push(widgets::secondary_button(tr("Undo deleting"), Some(wrap(Msg::Undo))));
-    }
     let left = column![
         container(list).padding(6).style(theme::card).width(Fill),
-        buttons,
+        widgets::secondary_button(tr("New macro"), (p.macros.len() < MAX_MACROS).then(|| wrap(Msg::New))),
         memory,
         widgets::primary_button(tr("Write to keyboard"), app.wired().then(|| wrap(Msg::Write))),
     ]

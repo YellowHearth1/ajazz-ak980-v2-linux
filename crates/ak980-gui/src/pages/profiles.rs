@@ -52,7 +52,7 @@ fn wrap(m: Msg) -> Message {
     Message::Profiles(m)
 }
 
-fn send_profile(app: &mut App) -> Task<Message> {
+pub fn send_profile(app: &mut App) -> Task<Message> {
     if !app.wired() {
         return Task::none();
     }
@@ -105,13 +105,17 @@ pub fn update(app: &mut App, msg: Msg) -> Task<Message> {
         }
         Msg::Delete => {
             let name = app.cfg.active.clone();
+            app.checkpoint(tr!("Profile “{name}” deleted", name = name));
             match app.cfg.remove(&name) {
                 Ok(()) => {
                     app.profiles.rename.clear();
                     app.save();
                     return send_profile(app);
                 }
-                Err(e) => app.notify(e.to_string(), true),
+                Err(e) => {
+                    app.undo = None;
+                    app.notify(e.to_string(), true);
+                }
             }
         }
         Msg::Export => {

@@ -26,6 +26,8 @@ pub enum Message {
     Tick(Instant),
     /// The window is about to close: what is not saved yet is written first.
     CloseRequested,
+    /// Puts back what the last deletion or reset took away.
+    Undo,
     /// A keyboard operation finished: the notice to show, or the error.
     Done(Result<String, String>),
     SwitchProfile(String),
@@ -61,6 +63,15 @@ pub struct Toast {
     pub at: Instant,
 }
 
+/// The settings as they were before a deletion or a reset, offered back until the next change.
+pub struct Undo {
+    /// What was done, shown next to the button.
+    pub what: String,
+    cfg: Config,
+    /// Saves since the checkpoint: the first is the deletion itself, a second one is a new change.
+    saves: u8,
+}
+
 pub struct App {
     pub cfg: Config,
     pub page: Page,
@@ -77,6 +88,7 @@ pub struct App {
     saved_at: Option<Instant>,
     /// Changes made since the last write of the settings file.
     unsaved: bool,
+    pub undo: Option<Undo>,
     pub lighting: pages::lighting::State,
     pub colours: pages::colours::State,
     pub keys: pages::keys::State,
@@ -120,6 +132,7 @@ impl App {
             config_mtime: config::mtime(&cfg.path),
             saved_at: None,
             unsaved: false,
+            undo: None,
             cfg,
             page: Page::Lighting,
             system_dark,
@@ -169,11 +182,22 @@ impl App {
     /// Saves the settings, at most twice a second: a drag over the keys or a slider sends a message
     /// for every step. The rest is written on the next tick or poll, and when the window closes.
     pub fn save(&mut self) {
+        if let Some(u) = &mut self.undo {
+            u.saves += 1;
+            if u.saves > 1 {
+                self.undo = None; // undoing now would take a later change away too
+            }
+        }
         if self.saved_at.is_some_and(|t| t.elapsed() < SAVE_GAP) {
             self.unsaved = true;
         } else {
             self.save_now();
         }
+    }
+
+    /// Remembers the settings before a deletion or a reset (`what` says which), for Undo.
+    pub fn checkpoint(&mut self, what: String) {
+        self.undo = Some(Undo { what, cfg: self.cfg.clone(), saves: 0 });
     }
 
     /// Writes the settings file now; a failure becomes a notice.
@@ -214,7 +238,8 @@ impl App {
             Message::Poll => {
                 self.save_if_due();
                 let read = self.battery_at.is_none_or(|t| t.elapsed() > Duration::from_secs(60));
-                self.toasts.retain(|t| t.at.elapsed() < Duration::from_secs(if t.error { 9 } else { 5 }));
+                // Errors stay until they are closed, so one is never missed; the rest go after 6 s
+                self.toasts.retain(|t| t.error || t.at.elapsed() < Duration::from_secs(6));
                 Task::perform(blocking(move || poll_status(read)), |s| Message::Polled(s.unwrap_or_default()))
             }
             Message::Polled(status) => {
@@ -232,6 +257,7 @@ impl App {
                 // time older than our own last write is a poll that started before that write.
                 if status.config_mtime.is_some() && status.config_mtime > self.config_mtime {
                     self.unsaved = false; // the newer file wins over changes not written yet
+                    self.undo = None; // and putting an old copy back would undo that program's change
                     self.config_mtime = status.config_mtime;
                     let active = std::mem::take(&mut self.cfg.active);
                     self.cfg = Config::load();
@@ -253,6 +279,14 @@ impl App {
                 pages::lighting::tick(self, now);
                 pages::screen::tick(self, now);
                 Task::none()
+            }
+            Message::Undo => {
+                let Some(u) = self.undo.take() else { return Task::none() };
+                let switched = u.cfg.active != self.cfg.active;
+                self.cfg = u.cfg;
+                self.save_now();
+                // A deleted profile was the active one: the keyboard gets it back too
+                if switched { pages::profiles::send_profile(self) } else { Task::none() }
             }
             Message::CloseRequested => {
                 if self.unsaved {
@@ -438,9 +472,23 @@ impl App {
             .into()
     }
 
-    /// Persistent notices: no access, or the cable a page needs.
+    /// Persistent notices: what can be undone, no access, or the cable a page needs.
     fn notices(&self) -> Element<'_, Message> {
         let mut col = column![].spacing(8).padding([0.0, theme::PAGE_PAD]);
+        if let Some(u) = &self.undo {
+            col = col.push(
+                container(
+                    row![
+                        text(u.what.clone()).size(theme::TEXT).width(Fill),
+                        widgets::secondary_button(tr("Undo"), Some(Message::Undo)),
+                    ]
+                    .spacing(16)
+                    .align_y(Alignment::Center),
+                )
+                .padding([8, 14])
+                .style(theme::banner),
+            );
+        }
         if self.status.access == Some(false) {
             col = col.push(
                 container(

@@ -113,6 +113,7 @@ pub fn update(app: &mut App, msg: Msg) -> Task<Message> {
         }
         Msg::ResetLayer => {
             let fn_layer = app.keys.fn_layer;
+            app.checkpoint(if fn_layer { tr("Fn layer reset") } else { tr("Base layer reset") });
             app.cfg.profile_mut().layer_mut(fn_layer).clear();
             app.save();
             load_draft(app);

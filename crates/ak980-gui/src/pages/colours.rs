@@ -40,6 +40,9 @@ fn wrap(m: Msg) -> Message {
 }
 
 pub fn update(app: &mut App, msg: Msg) -> Task<Message> {
+    if matches!(msg, Msg::Clear | Msg::FillAll) {
+        app.checkpoint(if matches!(msg, Msg::Clear) { tr("Key colours cleared") } else { tr("Every key painted") });
+    }
     let brush = app.colours.brush;
     let p = app.cfg.profile_mut();
     match msg {

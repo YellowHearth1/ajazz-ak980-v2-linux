@@ -2,7 +2,7 @@
 //! a colour picker and level sliders. Sizes and colours come from `theme`.
 
 use ak980_core::i18n::tr;
-use iced::widget::{button, column, container, row, slider, space, text, text_input, Column};
+use iced::widget::{button, column, container, row, slider, space, text, text_input, tooltip, Column};
 use iced::{Alignment, Color, Element, Fill, Length};
 
 use crate::app::Message;
@@ -111,6 +111,12 @@ pub fn segmented<'a, T: Copy + PartialEq + 'a>(
         s
     })
     .into()
+}
+
+/// A tooltip naming what a control without a text label does, as icon buttons need.
+pub fn hint<'a>(control: impl Into<Element<'a, Message>>, label: String) -> Element<'a, Message> {
+    tooltip(control, container(text(label).size(theme::SMALL)).padding([4, 8]).style(theme::card), tooltip::Position::Bottom)
+        .into()
 }
 
 pub fn primary_button<'a>(label: String, msg: Option<Message>) -> button::Button<'a, Message> {
