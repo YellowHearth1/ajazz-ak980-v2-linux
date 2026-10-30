@@ -190,7 +190,7 @@ root.
 | screen upload | yes, 2026-10-28 | ak980-studio |
 | real-time frames | yes, 2026-10-28: colours, timing and stall behaviour, then end to end through the agent | OpenRGB / SignalRGB on the F108 Pro |
 | lighting effects (`13`) | sent and acknowledged, 2026-10-28 | ak980-studio |
-| per-key colours, options, key layers, macros | not on this unit | ak980-studio on an AK980 V2 |
+| per-key colours, options, key layers, macros | yes, 2026-10-30 with the Rust version over the cable: per-key colours (WASD red, Esc green), Win lock, base layer (Shift+B, disabled key, macro, three keys at once, mute), Fn layer (Fn+Num1 → C), a macro typing "ok"; read from the keyboard's own input events, then restored | ak980-studio on an AK980 V2 |
 | colour read-back (`F5`) | answers, but the table does not follow animated effects | ak980-studio on the F108 Pro |
 | dongle battery | yes, 2026-10-29: `20 01 00 64` (100 %); about 120 ms for the first request after idle, 13 ms after | ak980-studio |
 | dongle clock | yes, 2026-10-29: a test time sent over the dongle showed on the screen; the agent syncs on its own when the keyboard switches to 2.4 GHz | taken from the vendor driver |
