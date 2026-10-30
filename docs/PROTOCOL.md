@@ -88,6 +88,11 @@ Lighting brightness and speed are 0–5, direction 0 left, 1 down, 2 up, 3 right
 
 `SLOT` is the screen page the vendor app sends along ("selected list item + 1", normally 1).
 
+On the AK980 V2 every clock packet switches the screen to its clock page, whatever `SLOT` says
+(checked 2026-10-30 with 1 and 2, while the animation was on the screen). Setting the clock is
+therefore also what puts the clock page back after the computer starts; the app sets it on connect
+only when asked to.
+
 ### Screen
 
 The panel is 240 × 135, RGB565. The upload blob is
@@ -103,6 +108,12 @@ It goes out as `04 18`, `04 72 SLOT .. .. .. .. .. PAGES`, then each 4 KiB page 
 output report on interface 2 (report ID 0 + page). The keyboard acknowledges every page with an
 input report after writing it to flash, about 145 ms per page; then `04 02`. There is no command to
 read the animation back.
+
+The keyboard keeps one animation. An upload with `SLOT` 2 (2026-10-30, one frame) replaced the
+animation that had been sent with `SLOT` 1, and the knob's screen menu then offered only the new
+one and the clock page. After an upload the screen shows the animation. No known command switches
+to the animation page without uploading, so showing something else for a while and going back
+means uploading the old animation again: 28 frames are 444 pages, about 64 s of flash writes.
 
 ### Real-time frames
 
@@ -193,7 +204,8 @@ same then.
 | Command | On an AK980 V2 by this project | Elsewhere |
 |---|---|---|
 | clock over USB | yes, 2026-10-28 | ak980-studio |
-| screen upload | yes, 2026-10-28 | ak980-studio |
+| screen upload | yes, 2026-10-28; 2026-10-30: one animation only, whatever the slot | ak980-studio |
+| clock page | yes, 2026-10-30: every clock packet shows the clock page | |
 | real-time frames | yes, 2026-10-28: colours, timing and stall behaviour, then end to end through the agent | OpenRGB / SignalRGB on the F108 Pro |
 | lighting effects (`13`) | sent and acknowledged, 2026-10-28 | ak980-studio |
 | per-key colours, options, key layers, macros | yes, 2026-10-30 with the Rust version over the cable: per-key colours (WASD red, Esc green), Win lock, base layer (Shift+B, disabled key, macro, three keys at once, mute), Fn layer (Fn+Num1 → C), a macro typing "ok"; read from the keyboard's own input events, then restored | ak980-studio on an AK980 V2 |
