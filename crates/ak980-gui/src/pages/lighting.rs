@@ -36,6 +36,8 @@ pub struct State {
     audio: Option<AudioMeter>,
     system: SystemReadings,
     overlays: Overlays,
+    /// Seconds into the typing shown for "Single on" and "Single off".
+    typing: f32,
 }
 
 #[derive(Debug, Clone)]
@@ -198,14 +200,50 @@ pub fn keep_engine(app: &mut App) -> Task<Message> {
 }
 
 pub fn animating(app: &App) -> bool {
-    app.page == Page::Lighting && app.cfg.profile().light_source == LightSource::Host
+    let p = app.cfg.profile();
+    app.page == Page::Lighting
+        && (p.light_source == LightSource::Host || (p.light_source == LightSource::Firmware && reacts_to_keys(p.lighting.mode)))
+}
+
+/// "Single on" lights the key being pressed, "Single off" darkens it: the drawing shows them typing.
+fn reacts_to_keys(mode: u8) -> bool {
+    matches!(mode, 2 | 3)
+}
+
+/// The keys typed in the preview of the effects that react to keys, one every `TYPING_STEP` seconds.
+const TYPING: [&str; 12] = ["H", "E", "L", "L", "O", "Space", "W", "O", "R", "L", "D", "Enter"];
+const TYPING_STEP: f32 = 0.24;
+/// How long a key stays lit after its press, as the firmware lets it fade.
+const TYPING_FADE: f32 = 0.7;
+
+/// How strongly each key is pressed `t` seconds into the typing, 1 just pressed to 0 faded.
+fn typing(t: f32) -> BTreeMap<u8, f32> {
+    let cycle = TYPING.len() as f32 * TYPING_STEP + 1.2; // a pause before it starts again
+    let t = t % cycle;
+    let mut lit = BTreeMap::new();
+    for (i, name) in TYPING.iter().enumerate() {
+        let since = t - i as f32 * TYPING_STEP;
+        if (0.0..TYPING_FADE).contains(&since)
+            && let Ok(k) = layout::find_key(name)
+        {
+            let v = 1.0 - since / TYPING_FADE;
+            let e = lit.entry(k.index).or_insert(0.0_f32);
+            *e = e.max(v * v);
+        }
+    }
+    lit
 }
 
 /// The next preview frame of the PC effect.
 pub fn tick(app: &mut App, now: Instant) {
-    if !animating(app) {
+    let host = app.cfg.profile().light_source == LightSource::Host;
+    if !animating(app) || !host {
         if let Some(mut audio) = app.lighting.audio.take() {
             audio.stop();
+        }
+        if animating(app) {
+            let t0 = *app.lighting.t0.get_or_insert(now);
+            app.lighting.typing = now.duration_since(t0).as_secs_f32();
         }
         return;
     }
@@ -256,20 +294,23 @@ fn firmware_preview(app: &App) -> BTreeMap<u8, Color> {
     let k = if m.has(CAP_BRIGHTNESS) { l.brightness as f32 / MAX_LEVEL as f32 } else { 1.0 };
     let (leds, pos) = layout::positions();
     let rainbow = l.rainbow || !m.has(CAP_COLOR);
-    // "Single on" lights only the key being pressed: show it on the two home-row keys
-    let only: Option<Vec<u8>> = (l.mode == 2).then(|| {
-        ["F", "J"].iter().filter_map(|n| layout::find_key(n).ok()).map(|k| k.index).collect()
-    });
+    // The effects that react to keys show them typing: a pressed key lights up ("Single on") or
+    // goes dark ("Single off"), then fades back
+    let pressed = reacts_to_keys(l.mode).then(|| typing(app.lighting.typing));
     leds.iter()
         .zip(pos)
-        .filter(|(led, _)| only.as_ref().is_none_or(|o| o.contains(led)))
-        .map(|(led, p)| {
+        .filter_map(|(led, p)| {
             let c = if rainbow {
                 effects::hsv(p[0] * 0.9, 1.0, 1.0)
             } else {
                 [l.r as f32 / 255.0, l.g as f32 / 255.0, l.b as f32 / 255.0]
             };
-            (*led, Color::from_rgb(c[0] * k, c[1] * k, c[2] * k))
+            let lit = match (&pressed, l.mode) {
+                (Some(keys), 2) => keys.get(led).copied().unwrap_or(0.0),
+                (Some(keys), _) => 1.0 - keys.get(led).copied().unwrap_or(0.0),
+                (None, _) => 1.0,
+            };
+            (lit > 0.01).then(|| (*led, Color::from_rgb(c[0] * k * lit, c[1] * k * lit, c[2] * k * lit)))
         })
         .collect()
 }
@@ -442,4 +483,19 @@ fn pc_effect(app: &App) -> Element<'_, Message> {
         col = col.push(caption(tr("Click keys on the drawing to try it.")));
     }
     col.push(overlays(app)).into()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn typing_presses_one_key_after_another_and_lets_them_fade() {
+        let h = layout::find_key("H").unwrap().index;
+        let e = layout::find_key("E").unwrap().index;
+        assert_eq!(typing(0.0).get(&h), Some(&1.0));
+        let later = typing(TYPING_STEP + 0.01);
+        assert!(later[&e] > 0.9 && later[&h] < 1.0, "E pressed, H fading");
+        assert!(!typing(TYPING_FADE + 0.01).contains_key(&h), "H faded out");
+    }
 }

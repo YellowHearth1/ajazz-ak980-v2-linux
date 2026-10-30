@@ -205,22 +205,15 @@ fn json_diff(path: &str, a: &Value, b: &Value, out: &mut Vec<String>) {
 }
 
 #[test]
-fn config_written_by_python_round_trips() {
+fn config_written_by_python_comes_through_an_update() {
     let g = golden();
     let cfg = rust_config(&g);
     let saved: Value = serde_json::from_str(&cfg.to_json()).unwrap();
     let mut diffs = Vec::new();
     json_diff("config", &g["config"], &saved, &mut diffs);
-    // Settings added since 0.0.1; Python 0.0.1 keeps only the fields it knows, so it still loads these files
-    const NEW_SETTINGS: [&str; 10] = ["config.settings.clock_sync: python null",
-                                     "config.settings.battery_insights: python null",
-                                     "config.settings.notifications: python null", "config.settings.theme: python null",
-                                     "config.settings.accent: python null", "config.settings.colorway: python null",
-                                     "config.settings.overlay_locks: python null",
-                                     "config.settings.overlay_lock_color: python null",
-                                     "config.settings.overlay_notifications: python null",
-                                     "config.settings.overlay_notify_color: python null"];
-    diffs.retain(|d| !NEW_SETTINGS.iter().any(|new| d.starts_with(new)));
+    // What a 0.0.1 file holds must come through an update; settings added since then are not
+    // compared (0.0.1 itself is no longer supported, so it need not read the files back)
+    diffs.retain(|d| !(d.starts_with("config.settings.") && d.contains(": python null")));
     assert!(diffs.is_empty(), "{} differences:\n{}", diffs.len(), diffs.join("\n"));
 }
 
