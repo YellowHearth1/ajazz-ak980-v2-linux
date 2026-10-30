@@ -339,6 +339,69 @@ fn tz_key() -> (i64, String) {
     (tm.tm_gmtoff, zone)
 }
 
+// ------------------------------------------------------------ when to set the clock
+
+/// What made the agent think of setting the keyboard's clock.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ClockCause {
+    Connected,
+    /// The system time jumped, or the computer woke from sleep.
+    TimeJump,
+    ZoneChanged,
+    NewDay,
+    Periodic,
+    /// A sync that was due did not reach the keyboard.
+    Retry,
+}
+
+impl ClockCause {
+    fn text(self, link: Option<&str>) -> String {
+        match self {
+            Self::Connected => format!("connected ({})", link.unwrap_or_default()),
+            Self::TimeJump => "system time changed or resumed from sleep".into(),
+            Self::ZoneChanged => "time zone changed".into(),
+            Self::NewDay => "new day".into(),
+            Self::Periodic => "periodic".into(),
+            Self::Retry => "retry".into(),
+        }
+    }
+}
+
+/// Whether to set the clock now, by the `clock_sync` setting. On the AK980 V2 every setting of the
+/// clock also switches the screen to its clock page, so only "hourly" sets it on every occasion;
+/// "daily" and "weekly" wait that long since the last time (restarts in between do not count) and
+/// follow a change of time zone at once; "manual" leaves it to the user.
+pub fn clock_due(policy: &str, cause: ClockCause, since_last: Option<Duration>) -> bool {
+    let wait = match policy {
+        "manual" => return false,
+        // A little less than a day and a week, so that the computer started a bit earlier than
+        // yesterday still sets it
+        "daily" => Duration::from_secs(20 * 3600),
+        "weekly" => Duration::from_secs(6 * 24 * 3600 + 20 * 3600),
+        _ => return true,
+    };
+    match cause {
+        ClockCause::ZoneChanged | ClockCause::Retry => true,
+        ClockCause::Periodic => false,
+        _ => since_last.is_none_or(|d| d >= wait),
+    }
+}
+
+/// How long ago the agent last set the clock, from its record.
+fn clock_synced_ago() -> Option<Duration> {
+    let secs: u64 = fs::read_to_string(paths::clock_record()).ok()?.trim().parse().ok()?;
+    SystemTime::now().duration_since(UNIX_EPOCH + Duration::from_secs(secs)).ok()
+}
+
+fn record_clock_sync() {
+    let path = paths::clock_record();
+    let secs = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
+    let _ = path.parent().map(fs::create_dir_all);
+    if let Err(e) = fs::write(&path, format!("{secs}\n")) {
+        debug!("cannot record the clock sync in {}: {e}", path.display());
+    }
+}
+
 /// Sets the clock over whatever link is there. Returns "USB", "2.4G" or None.
 pub fn sync_clock_once(slot: u8) -> Result<Option<&'static str>> {
     if let Some((cmd, lcd)) = WiredKeyboard::find() {
@@ -661,21 +724,35 @@ impl Agent {
                 None
             };
 
-            let mut reason: Option<String> = None;
+            let mut cause: Option<ClockCause> = None;
             if now_present.is_some() && now_present != present {
-                reason = Some(format!("connected ({})", now_present.unwrap_or_default()));
+                cause = Some(ClockCause::Connected);
             } else if now_present.is_some() {
                 if (wall() - wall_ref).abs() > 2.0 {
-                    reason = Some("system time changed or resumed from sleep".into());
+                    cause = Some(ClockCause::TimeJump);
                 } else if tz_key() != tz {
-                    reason = Some("time zone changed".into());
+                    cause = Some(ClockCause::ZoneChanged);
                 } else if LocalTime::now().date() != day {
-                    reason = Some("new day".into());
+                    cause = Some(ClockCause::NewDay);
                 } else if last_sync.is_some_and(|t| t.elapsed() > interval) {
-                    reason = Some("periodic".into());
+                    cause = Some(ClockCause::Periodic);
                 } else if retry_at.is_some_and(|t| Instant::now() >= t) {
-                    reason = Some("retry".into());
+                    cause = Some(ClockCause::Retry);
                 }
+            }
+            if cause.is_some() {
+                // Seen, whether or not the setting lets it set the clock
+                wall_ref = wall();
+                tz = tz_key();
+                day = LocalTime::now().date();
+            }
+            let policy = if settings.clock_auto { settings.clock_sync.as_str() } else { "manual" };
+            // The system agent has no record of its own; it sets the clock as it always did
+            let since = if self.system { None } else { clock_synced_ago() };
+            // `--once` is asked for by hand or by a timer: it syncs whatever the setting says
+            let reason = cause.filter(|c| once || clock_due(policy, *c, since)).map(|c| c.text(now_present));
+            if let Some(c) = cause.filter(|_| reason.is_none() && !once) {
+                debug!("clock not set ({}): the setting is {policy}", c.text(now_present));
             }
             if now_present != present && !once && !self.system {
                 link_event(&format!(
@@ -703,8 +780,7 @@ impl Agent {
                 link_state = Some(state);
             }
 
-            // `--once` is asked for by hand or by a timer: it syncs whatever the setting says
-            if let Some(reason) = reason.as_deref().filter(|_| settings.clock_auto || once) {
+            if let Some(reason) = reason.as_deref() {
                 if reason.starts_with("connected") && !once {
                     wait(&STOP, Duration::from_secs(2)); // let the firmware bring up every interface
                 }
@@ -716,13 +792,13 @@ impl Agent {
                     info!("clock synced over {via} ({reason})");
                     last_sync = Some(Instant::now());
                     retry_at = None;
+                    if !self.system {
+                        record_clock_sync();
+                    }
                 } else {
                     // The dongle is there but the keyboard is not in 2.4 GHz mode, or asleep
                     retry_at = Some(Instant::now() + Duration::from_secs(30));
                 }
-                wall_ref = wall();
-                tz = tz_key();
-                day = LocalTime::now().date();
                 if once {
                     break if via.is_some() { 0 } else { 1 };
                 }
@@ -833,6 +909,26 @@ pub fn run(system: bool, interval: Option<u32>, once: bool) -> i32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_clock_is_set_as_often_as_the_setting_says() {
+        let (hour, day) = (Duration::from_secs(3600), Duration::from_secs(24 * 3600));
+        use ClockCause::*;
+        assert!(clock_due("hourly", Connected, Some(hour)));
+        assert!(clock_due("hourly", Periodic, Some(hour)));
+        assert!(!clock_due("manual", ZoneChanged, None), "manual never does it on its own");
+        // daily: once a day, whatever restarts in between; a new zone at once
+        assert!(clock_due("daily", Connected, None), "never set before");
+        assert!(!clock_due("daily", Connected, Some(3 * hour)), "set this morning, the computer restarted");
+        assert!(clock_due("daily", Connected, Some(day)));
+        assert!(!clock_due("daily", Periodic, Some(2 * day)), "not in the middle of the day");
+        assert!(clock_due("daily", ZoneChanged, Some(hour)));
+        assert!(clock_due("daily", Retry, Some(hour)));
+        // weekly
+        assert!(!clock_due("weekly", NewDay, Some(3 * day)));
+        assert!(clock_due("weekly", Connected, Some(7 * day)));
+        assert!(clock_due("weekly", TimeJump, None));
+    }
 
     #[test]
     fn notices_come_once_per_event() {

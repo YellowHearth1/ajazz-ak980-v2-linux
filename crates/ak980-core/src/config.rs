@@ -161,6 +161,10 @@ pub struct Launcher {
 pub struct Settings {
     pub language: String,
     pub clock_auto: bool,
+    /// How often the agent sets the keyboard's clock on its own: "hourly", "daily", "weekly" or
+    /// "manual". Setting the clock also switches the screen to its clock page, away from the
+    /// animation, so the quieter choices keep the animation up. `clock_auto` off means "manual".
+    pub clock_sync: String,
     pub clock_slot: u8,
     pub sync_interval_min: u32,
     pub lcd_slot: u8,
@@ -197,6 +201,7 @@ impl Default for Settings {
         Self {
             language: "auto".into(),
             clock_auto: true,
+            clock_sync: "weekly".into(),
             clock_slot: 1,
             sync_interval_min: 60,
             lcd_slot: 1,

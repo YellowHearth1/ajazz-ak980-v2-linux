@@ -53,6 +53,11 @@ pub fn link_log() -> PathBuf {
     state_dir().join("link.log")
 }
 
+/// When the agent last set the keyboard's clock (Unix seconds), so a restart does not do it again.
+pub fn clock_record() -> PathBuf {
+    state_dir().join("clock-synced")
+}
+
 /// The keyboard's charge over time, from the agent's checks over 2.4 GHz.
 pub fn battery_log() -> PathBuf {
     state_dir().join("battery.log")

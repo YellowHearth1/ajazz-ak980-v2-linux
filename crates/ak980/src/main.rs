@@ -84,7 +84,9 @@ fn build() -> Command {
         .subcommand(
             sub("time", tr("sync the screen clock with the system time"))
                 .arg(Arg::new("slot").long("slot").value_parser(value_parser!(u8))
-                    .help(tr("screen page sent with the time (default 1)"))),
+                    .help(tr("screen page sent with the time (default 1)")))
+                .arg(Arg::new("auto").long("auto").value_parser(["hourly", "daily", "weekly", "manual"])
+                    .help(tr("how often the agent sets it by itself; each time the screen shows its clock page"))),
         )
         .subcommand(
             sub("agent", tr("background agent: clock, PC effects, profiles, launcher keys"))
@@ -442,7 +444,14 @@ fn cmd_list() {
     }
 }
 
-fn cmd_time(m: &ArgMatches, cfg: &Config) -> Result<()> {
+fn cmd_time(m: &ArgMatches, cfg: &mut Config) -> Result<()> {
+    if let Some(policy) = m.get_one::<String>("auto") {
+        cfg.settings.clock_sync.clone_from(policy);
+        cfg.settings.clock_auto = policy != "manual";
+        cfg.save()?;
+        say(tr!("The agent sets the clock: {policy}", policy = policy));
+        return Ok(());
+    }
     let slot = m.get_one::<u8>("slot").copied().unwrap_or(cfg.settings.clock_slot);
     let mut kb = AnyKeyboard::open()?;
     if !kb.sync_clock(None, slot)? {
@@ -1035,7 +1044,7 @@ fn run(m: &ArgMatches) -> Result<ExitCode> {
         "status" => cmd_status(sub, &cfg)?,
         "list" => cmd_list(),
         "battery" => cmd_battery(sub, &mut cfg)?,
-        "time" => cmd_time(sub, &cfg)?,
+        "time" => cmd_time(sub, &mut cfg)?,
         "lcd" => cmd_lcd(sub, &mut cfg)?,
         "effects" | "modes" => cmd_effects(),
         "light" => cmd_light(sub, &mut cfg)?,

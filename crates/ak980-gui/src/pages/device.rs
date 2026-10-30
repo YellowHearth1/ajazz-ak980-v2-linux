@@ -29,7 +29,7 @@ pub enum Msg {
     AllowAccess,
     Reconnect,
     SyncClock,
-    ClockAuto(bool),
+    ClockSync(Choice<&'static str>),
     WinLock(bool),
     AltTab(bool),
     AltF4(bool),
@@ -101,7 +101,10 @@ pub fn update(app: &mut App, msg: Msg) -> Task<Message> {
                 Ok(tr!("Clock synced over {link}", link = link))
             });
         }
-        Msg::ClockAuto(v) => app.cfg.settings.clock_auto = v,
+        Msg::ClockSync(c) => {
+            app.cfg.settings.clock_sync = c.value.to_string();
+            app.cfg.settings.clock_auto = c.value != "manual";
+        }
         Msg::WinLock(v) => o.disable_win = v,
         Msg::AltTab(v) => o.disable_alt_tab = v,
         Msg::AltF4(v) => o.disable_alt_f4 = v,
@@ -211,8 +214,11 @@ pub fn view(app: &App) -> Element<'_, Message> {
     let clock = vec![
         setting(tr("Sync clock"), Some(tr("Set the screen clock to the system time")),
                 widgets::secondary_button(tr("Sync clock now"), st.link.is_some().then(|| wrap(Msg::SyncClock)))),
-        setting(tr("Keep the clock in sync"), Some(tr("The background agent syncs when the keyboard connects, after sleep and every hour.")),
-                toggler(s.clock_auto).on_toggle(|v| wrap(Msg::ClockAuto(v))).style(theme::switch)),
+        setting(tr("Set the clock by itself"),
+                Some(tr("Setting the clock also switches the keyboard's screen from your animation to its clock page, so \
+                         the rarer, the longer the animation stays.")),
+                pick_list(clock_choices(), current_clock(s), |c| wrap(Msg::ClockSync(c))).style(theme::pick)
+                    .menu_style(theme::menu).width(260)),
     ];
 
     let b = &app.device.battery;
@@ -353,4 +359,18 @@ fn accent_swatches(app: &App) -> Element<'_, Message> {
         swatches = swatches.push(widgets::hint(pick, tr(name)));
     }
     swatches.into()
+}
+
+/// How often the agent sets the clock on its own.
+fn clock_choices() -> Vec<Choice<&'static str>> {
+    [("hourly", "When the keyboard connects and every hour"), ("daily", "Once a day"), ("weekly", "Once a week"),
+     ("manual", "Only when I ask")]
+        .into_iter()
+        .map(|(id, label)| Choice::new(id, tr(label)))
+        .collect()
+}
+
+fn current_clock(s: &ak980_core::config::Settings) -> Option<Choice<&'static str>> {
+    let id = if s.clock_auto { s.clock_sync.as_str() } else { "manual" };
+    clock_choices().into_iter().find(|c| c.value == id).or_else(|| clock_choices().into_iter().nth(2))
 }

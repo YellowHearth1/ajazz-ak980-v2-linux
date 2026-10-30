@@ -211,15 +211,16 @@ fn config_written_by_python_round_trips() {
     let saved: Value = serde_json::from_str(&cfg.to_json()).unwrap();
     let mut diffs = Vec::new();
     json_diff("config", &g["config"], &saved, &mut diffs);
-    // Settings that 0.0.2 adds; Python 0.0.1 keeps only the fields it knows, so it still loads these files
-    const NEW_IN_0_0_2: [&str; 9] = ["config.settings.battery_insights: python null",
+    // Settings added since 0.0.1; Python 0.0.1 keeps only the fields it knows, so it still loads these files
+    const NEW_SETTINGS: [&str; 10] = ["config.settings.clock_sync: python null",
+                                     "config.settings.battery_insights: python null",
                                      "config.settings.notifications: python null", "config.settings.theme: python null",
                                      "config.settings.accent: python null", "config.settings.colorway: python null",
                                      "config.settings.overlay_locks: python null",
                                      "config.settings.overlay_lock_color: python null",
                                      "config.settings.overlay_notifications: python null",
                                      "config.settings.overlay_notify_color: python null"];
-    diffs.retain(|d| !NEW_IN_0_0_2.iter().any(|new| d.starts_with(new)));
+    diffs.retain(|d| !NEW_SETTINGS.iter().any(|new| d.starts_with(new)));
     assert!(diffs.is_empty(), "{} differences:\n{}", diffs.len(), diffs.join("\n"));
 }
 
