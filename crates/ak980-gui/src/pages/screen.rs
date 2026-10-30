@@ -61,6 +61,7 @@ pub enum Msg {
     Contrast(i32),
     Saturation(i32),
     Speed(i32),
+    FixedDelay(i32),
     TrimStart(i32),
     TrimEnd(i32),
     Step(i32),
@@ -220,6 +221,7 @@ pub fn update(app: &mut App, msg: Msg) -> Task<Message> {
         Msg::Contrast(v) => o.contrast = v as f32 / 100.0,
         Msg::Saturation(v) => o.saturation = v as f32 / 100.0,
         Msg::Speed(v) => o.speed = v as f32 / 100.0,
+        Msg::FixedDelay(v) => o.fixed_delay = (v > 0).then_some(v as u32),
         Msg::TrimStart(v) => o.trim_start = v.max(0) as usize,
         Msg::TrimEnd(v) => o.trim_end = v.max(0) as usize,
         Msg::Step(v) => o.frame_step = v.max(1) as usize,
@@ -402,6 +404,9 @@ pub fn view(app: &App) -> Element<'_, Message> {
     ];
     let timing = vec![
         setting(tr("Speed"), None, widgets::ranged(percent(o.speed), 25, 400, "%", |v| wrap(Msg::Speed(v)))),
+        setting(tr("Same delay for every frame"), Some(tr("0 keeps the delays of the file")),
+                widgets::ranged(o.fixed_delay.unwrap_or(0) as i32, 0, lcd::MAX_DELAY as i32, &tr(" ms"),
+                                |v| wrap(Msg::FixedDelay(v)))),
         setting(tr("Keep every Nth"), Some(tr("Keeps a long GIF within the screen's 140 frames")),
                 widgets::ranged(o.frame_step as i32, 1, 10, "", |v| wrap(Msg::Step(v)))),
         setting(tr("Cut frames from the start"), None, widgets::ranged(o.trim_start as i32, 0, 200, "", |v| wrap(Msg::TrimStart(v)))),
