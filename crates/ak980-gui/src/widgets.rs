@@ -105,7 +105,8 @@ pub fn segmented<'a, T: Copy + PartialEq + 'a>(
         let b = button(text(label).size(theme::TEXT)).padding([6, 14]).style(theme::segment(value == selected));
         r = r.push(if value == selected { b } else { b.on_press(on(value)) });
     }
-    container(r).padding(2).style(|t| {
+    // Wraps onto a second line in a narrow window rather than running off the edge
+    container(r.wrap().vertical_spacing(2)).padding(2).style(|t| {
         let mut s = theme::card(t);
         s.background = Some(theme::roles().surface1.into());
         s

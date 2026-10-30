@@ -340,7 +340,7 @@ impl App {
         match page {
             "light" => pages::lighting::set_color(self, what, c),
             "paint" => {
-                self.colours.brush = c;
+                if what == "to" { self.colours.gradient_to = c } else { self.colours.brush = c }
                 Task::none()
             }
             "screen" => pages::screen::set_text_color(self, c),

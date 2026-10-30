@@ -128,8 +128,14 @@ mod screenshots {
                 .collect(),
             None => SHOTS.iter().map(|(p, t)| (*p, t.to_string(), "auto".into(), "mauve".into())).collect(),
         };
-        let langs: &[&str] = if pick.is_some() { &["en"] } else { &["en", "uk"] };
-        for &lang in langs {
+        // AK980_SHOTS_LANG=uk and AK980_SHOTS_WIDTH=980 (the narrowest window) check other cases
+        let langs: Vec<String> = match std::env::var("AK980_SHOTS_LANG") {
+            Ok(l) => vec![l],
+            Err(_) if pick.is_some() => vec!["en".into()],
+            Err(_) => vec!["en".into(), "uk".into()],
+        };
+        let width: f32 = std::env::var("AK980_SHOTS_WIDTH").ok().and_then(|w| w.parse().ok()).unwrap_or(1240.0);
+        for lang in &langs {
             ak980_core::i18n::set_language(lang);
             let dir = std::path::Path::new(&out).join(lang);
             let _ = std::fs::remove_dir_all(&dir);
@@ -161,7 +167,7 @@ mod screenshots {
                 };
                 let iced_theme = app.theme();
                 // A picked Device page is drawn whole, so its settings at the bottom show too
-                let size = if pick.is_some() && page == Page::Device { (1240.0, 1780.0) } else { (1240.0, 820.0) };
+                let size = if pick.is_some() && page == Page::Device { (width, 1780.0) } else { (width, 820.0) };
                 let mut ui = iced_test::Simulator::with_size(settings, size, app.view());
                 let shot = ui.snapshot(&iced_theme).expect("drawn");
                 let mut stem = format!("{}-{theme}", format!("{page:?}").to_lowercase());

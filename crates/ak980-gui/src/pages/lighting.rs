@@ -145,7 +145,7 @@ pub fn update(app: &mut App, msg: Msg) -> Task<Message> {
             }
             Task::none()
         }
-        Msg::Key(KeyEvent::Erased(_)) => Task::none(),
+        Msg::Key(KeyEvent::Erased(_) | KeyEvent::Picked(_)) => Task::none(),
         Msg::Sent(error) => {
             app.lighting.sending = false;
             if let Some(e) = error {

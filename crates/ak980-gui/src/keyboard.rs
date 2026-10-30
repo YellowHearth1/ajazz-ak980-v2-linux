@@ -21,7 +21,7 @@ pub enum Mode {
     View,
     /// A click selects one key.
     Select,
-    /// Press and drag to paint; the right button erases.
+    /// Press and drag to paint, the middle button erases, the right one picks a key's colour.
     Paint,
 }
 
@@ -30,6 +30,8 @@ pub enum KeyEvent {
     Pressed(u8),
     Painted(u8),
     Erased(u8),
+    /// The right button on a key in paint mode: take its colour.
+    Picked(u8),
 }
 
 pub struct Keyboard<'a, Message> {
@@ -113,17 +115,20 @@ impl<Message> canvas::Program<Message> for Keyboard<'_, Message> {
                 if let (Some(button), Some(key)) = (state.dragging, at)
                     && self.mode == Mode::Paint && state.last != Some(key) {
                         state.last = Some(key);
-                        return send(if button == mouse::Button::Right { KeyEvent::Erased(key) } else { KeyEvent::Painted(key) });
+                        return send(if button == mouse::Button::Middle { KeyEvent::Erased(key) } else { KeyEvent::Painted(key) });
                     }
                 changed.then(Action::request_redraw)
             }
-            canvas::Event::Mouse(mouse::Event::ButtonPressed(button @ (mouse::Button::Left | mouse::Button::Right))) => {
+            canvas::Event::Mouse(mouse::Event::ButtonPressed(
+                button @ (mouse::Button::Left | mouse::Button::Middle | mouse::Button::Right),
+            )) => {
                 let key = at?;
                 match (self.mode, button) {
+                    (Mode::Paint, mouse::Button::Right) => send(KeyEvent::Picked(key)),
                     (Mode::Paint, _) => {
                         state.dragging = Some(*button);
                         state.last = Some(key);
-                        send(if *button == mouse::Button::Right { KeyEvent::Erased(key) } else { KeyEvent::Painted(key) })
+                        send(if *button == mouse::Button::Middle { KeyEvent::Erased(key) } else { KeyEvent::Painted(key) })
                     }
                     (_, mouse::Button::Left) => send(KeyEvent::Pressed(key)),
                     _ => None,
