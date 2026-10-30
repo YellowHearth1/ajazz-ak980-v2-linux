@@ -188,6 +188,8 @@ pub struct Settings {
     /// Over any PC effect: the keyboard flashes when a desktop notification comes.
     pub overlay_notifications: bool,
     pub overlay_notify_color: [u8; 3],
+    /// Shows how long the charge lasts and how long charging takes, once whole cycles are measured.
+    pub battery_insights: bool,
 }
 
 impl Default for Settings {
@@ -214,6 +216,7 @@ impl Default for Settings {
             overlay_lock_color: [255, 255, 255],
             overlay_notifications: false,
             overlay_notify_color: [80, 160, 255],
+            battery_insights: false,
         }
     }
 }

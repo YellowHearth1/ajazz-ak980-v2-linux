@@ -76,6 +76,12 @@ fn build() -> Command {
         )
         .subcommand(sub("list", tr("the keyboard's HID interfaces")))
         .subcommand(
+            sub("battery", tr("battery measurements: how long a charge lasts, charging time, condition"))
+                .arg(Arg::new("show").long("show").value_name("on|off").value_parser(parse_onoff)
+                    .help(tr("show the estimates in the window and in `ak980 status`")))
+                .arg(flag("reset", tr("forget the measured cycles and measure again (the readings stay)"))),
+        )
+        .subcommand(
             sub("time", tr("sync the screen clock with the system time"))
                 .arg(Arg::new("slot").long("slot").value_parser(value_parser!(u8))
                     .help(tr("screen page sent with the time (default 1)"))),
@@ -257,7 +263,9 @@ struct StatusReport {
     /// The charge: read now over 2.4 GHz, or the agent's last reading.
     battery: Option<u8>,
     battery_live: bool,
-    hours_left: Option<f32>,
+    estimate: Option<battery::Estimate>,
+    /// Battery measurements are on: the estimate is shown.
+    insights: bool,
     profile: String,
     agent: bool,
 }
@@ -275,8 +283,10 @@ fn status_report(cfg: &Config) -> StatusReport {
         access: permissions::accessible(),
         battery: live.or_else(|| history.last().map(|(_, l)| *l)),
         battery_live: live.is_some(),
-        // On the cable it charges, so only a running-down battery gets an estimate
-        hours_left: (link == Some(Link::Dongle)).then(|| battery::hours_left(&history, now)).flatten(),
+        estimate: link.and_then(|l| {
+            battery::Measurements::load(&paths::battery_measurements()).estimate(&history, l == Link::Usb, now)
+        }),
+        insights: cfg.settings.battery_insights,
         profile: cfg.active.clone(),
         agent: runtime::agent_running(),
     }
@@ -292,18 +302,21 @@ fn status_lines(r: &StatusReport) -> Vec<String> {
     if r.access == Some(false) {
         lines.push(tr("Access: no permission — run `ak980 setup`"));
     }
-    match (r.battery, r.link) {
-        (Some(level), _) => {
+    let estimate = r.estimate.filter(|_| r.insights);
+    match (r.battery, r.link, estimate) {
+        // On the cable in wired mode only the measured charging can tell
+        (_, Some(Link::Usb), Some(e)) => lines.push(tr!("Battery: {level}", level = battery::describe(&e))),
+        (Some(level), _, e) => {
             let mut text = format!("{level}%");
             if !r.battery_live {
                 text = tr!("{level} at the last check", level = text);
             }
-            if let Some(h) = r.hours_left {
-                text = format!("{text}, {}", battery::time_left(h));
+            if let Some(e) = e {
+                text = format!("{text}, {}", battery::describe(&e));
             }
             lines.push(tr!("Battery: {level}", level = text));
         }
-        (None, Some(Link::Dongle)) => {
+        (None, Some(Link::Dongle), _) => {
             lines.push(tr!("Battery: {level}", level = tr("no answer (is the keyboard in 2.4 GHz mode and awake?)")))
         }
         _ => {}
@@ -322,9 +335,18 @@ fn cmd_status(m: &ArgMatches, cfg: &Config) -> Result<()> {
         None => None,
     };
     if m.get_flag("json") {
+        let round = |h: f32| (h * 10.0).round() / 10.0;
+        let estimate = match r.estimate {
+            Some(battery::Estimate::Lasts(h)) => serde_json::json!({"state": "lasts", "hours": round(h)}),
+            Some(battery::Estimate::Charging { hours, level }) => {
+                serde_json::json!({"state": "charging", "hours": round(hours), "level": level})
+            }
+            Some(battery::Estimate::Full) => serde_json::json!({"state": "full"}),
+            None => serde_json::Value::Null,
+        };
         let json = serde_json::json!({
             "link": link, "access": r.access, "battery": r.battery, "battery_live": r.battery_live,
-            "hours_left": r.hours_left.map(|h| (h * 10.0).round() / 10.0), "profile": r.profile, "agent": r.agent,
+            "estimate": estimate, "profile": r.profile, "agent": r.agent,
         });
         say(json.to_string());
     } else if m.get_flag("waybar") {
@@ -347,6 +369,53 @@ fn cmd_status(m: &ArgMatches, cfg: &Config) -> Result<()> {
         for line in status_lines(&r) {
             say(line);
         }
+    }
+    Ok(())
+}
+
+fn local_date(secs: u64) -> String {
+    let (y, m, d) = ak980_core::time::LocalTime::from_unix(secs as i64).date();
+    format!("{y}-{m:02}-{d:02}")
+}
+
+fn cmd_battery(m: &ArgMatches, cfg: &mut Config) -> Result<()> {
+    let path = paths::battery_measurements();
+    if m.get_flag("reset") {
+        if path.exists() {
+            std::fs::remove_file(&path)?;
+        }
+        say(tr("The measured cycles are forgotten; the agent measures again from the readings to come."));
+        return Ok(());
+    }
+    if let Some(on) = m.get_one::<bool>("show") {
+        cfg.settings.battery_insights = *on;
+        cfg.save()?;
+    }
+    let history = battery::read(&paths::battery_log());
+    let meas = battery::Measurements::load(&path);
+    match history.first() {
+        Some((t, _)) => say(tr!("Readings: {count} changes since {date}", count = history.len(), date = local_date(*t))),
+        None => say(tr("No readings yet: the background agent reads the battery every minute in 2.4 GHz mode.")),
+    }
+    match (meas.full_charge_hours(), meas.discharges.last()) {
+        (Some(h), Some(last)) => say(tr!("A full charge lasts about {time} (measurements: {count}, the last on {date})",
+                                         time = battery::duration(h), count = meas.discharges.len(), date = local_date(last.end))),
+        _ => say(tr("How long a charge lasts: not measured yet. Use the keyboard over 2.4 GHz from 90 % or more down to 20 % or less.")),
+    }
+    match meas.charging_hours() {
+        Some(h) => say(tr!("Charging from empty to full takes about {time}", time = battery::duration(h))),
+        None => say(tr("Charging time: not measured yet. Charge it from 20 % or less to full while it stays in 2.4 GHz mode, so it can tell its level.")),
+    }
+    if let Some((share, cycles)) = meas.condition() {
+        say(tr!("Condition: a charge lasts about {share} of the first measured one (measured cycles: {cycles})",
+                share = format!("{}%", (share * 100.0).round()), cycles = cycles));
+    }
+    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs();
+    if let Some(e) = device::connection_state().and_then(|l| meas.estimate(&history, l == Link::Usb, now)) {
+        say(tr!("Now: {estimate}", estimate = battery::describe(&e)));
+    }
+    if !cfg.settings.battery_insights {
+        say(tr("The window and `ak980 status` show the estimates with `ak980 battery --show on`."));
     }
     Ok(())
 }
@@ -933,6 +1002,7 @@ fn run(m: &ArgMatches) -> Result<ExitCode> {
         "gui" => open_gui(sub.get_flag("tray"))?,
         "status" => cmd_status(sub, &cfg)?,
         "list" => cmd_list(),
+        "battery" => cmd_battery(sub, &mut cfg)?,
         "time" => cmd_time(sub, &cfg)?,
         "lcd" => cmd_lcd(sub, &mut cfg)?,
         "effects" | "modes" => cmd_effects(),

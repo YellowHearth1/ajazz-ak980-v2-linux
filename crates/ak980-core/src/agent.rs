@@ -685,6 +685,7 @@ impl Agent {
                 ));
                 link_state = None;
                 next_link_check = Instant::now() + Duration::from_secs(5); // the radio link takes a moment
+                learn_battery(None, Some(now_present == Some("usb")));
             }
             present = now_present;
 
@@ -692,10 +693,7 @@ impl Agent {
                 next_link_check = Instant::now() + Duration::from_secs(LINK_CHECK_SECONDS);
                 let answer = ask_battery();
                 if let LinkAnswer::Level(level) = answer {
-                    let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
-                    if let Err(e) = battery::record(&paths::battery_log(), now, level) {
-                        warn!("cannot keep the battery record: {e}");
-                    }
+                    learn_battery(Some(level), None);
                 }
                 let state = record_link(link_state.as_deref(), &answer, &paths::link_log());
                 let notice = link_notice(link_state.as_deref(), &state, &answer, &mut self.battery_alert);
@@ -764,6 +762,36 @@ impl Agent {
         }
         lock.release();
         code
+    }
+}
+
+/// Keeps the battery record: a new `level` read over 2.4 GHz, and whether the keyboard went onto
+/// the cable in wired mode, where it charges without telling its level.
+fn learn_battery(level: Option<u8>, on_cable: Option<bool>) {
+    let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
+    let log = paths::battery_log();
+    if let Some(level) = level
+        && let Err(e) = battery::record(&log, now, level)
+    {
+        warn!("cannot keep the battery record: {e}");
+    }
+    let path = paths::battery_measurements();
+    let mut m = battery::Measurements::load(&path);
+    let history = battery::read(&log);
+    let mut changed = m.learn(&history);
+    match on_cable {
+        Some(true) => {
+            m.cable_since = history.last().map(|(_, l)| (now, *l));
+            changed = true;
+        }
+        Some(false) if m.cable_since.is_some() => {
+            m.cable_since = None;
+            changed = true;
+        }
+        _ => {}
+    }
+    if changed && let Err(e) = m.save(&path) {
+        warn!("cannot keep the battery measurements: {e}");
     }
 }
 

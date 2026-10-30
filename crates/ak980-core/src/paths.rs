@@ -58,4 +58,9 @@ pub fn battery_log() -> PathBuf {
     state_dir().join("battery.log")
 }
 
+/// What the battery record has taught: measured cycles and the charging curve.
+pub fn battery_measurements() -> PathBuf {
+    state_dir().join("battery.json")
+}
+
 pub const SYSTEM_CONFIG: &str = "/etc/ak980/agent.conf";
