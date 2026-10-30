@@ -83,11 +83,11 @@ mod screenshots {
     const SHOTS: [(Page, &str); 8] = [
         (Page::Lighting, "graphite"),
         (Page::Lighting, "lavender"),
-        (Page::Colours, "graphite"),
-        (Page::Keys, "lavender"),
+        (Page::Colours, "mint"),
+        (Page::Keys, "frost"),
         (Page::Macros, "lavender"),
         (Page::Screen, "graphite"),
-        (Page::Profiles, "lavender"),
+        (Page::Profiles, "dusk"),
         (Page::Device, "graphite"),
     ];
 
