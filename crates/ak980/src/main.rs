@@ -653,7 +653,7 @@ fn parse_balance(s: &str) -> std::result::Result<[u8; 3], String> {
 fn cmd_light(m: &ArgMatches, cfg: &mut Config) -> Result<()> {
     if let Some(gains) = m.get_one::<[u8; 3]>("balance") {
         cfg.settings.white_balance = *gains;
-        device::set_white_balance(*gains);
+        device::set_calibration(cfg.settings.calibration());
     }
     let p = cfg.profile_mut();
     let s = &mut p.lighting;
@@ -1136,7 +1136,7 @@ fn run(m: &ArgMatches) -> Result<ExitCode> {
     // SAFETY: restoring the default action of one signal before any thread starts
     unsafe { libc::signal(libc::SIGPIPE, libc::SIG_DFL) };
     let mut cfg = Config::load();
-    device::set_white_balance(cfg.settings.white_balance);
+    device::set_calibration(cfg.settings.calibration());
     match name {
         "gui" => open_gui(sub.get_flag("tray"))?,
         "status" => cmd_status(sub, &cfg)?,

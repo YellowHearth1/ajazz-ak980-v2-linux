@@ -2,6 +2,7 @@
 
 use ak980_core::i18n::tr;
 
+pub mod calibration;
 pub mod colours;
 pub mod device;
 pub mod keys;
@@ -14,6 +15,7 @@ pub mod screen;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Page {
     Screen,
+    Calibration,
     Lighting,
     Colours,
     Keys,
@@ -23,12 +25,13 @@ pub enum Page {
 }
 
 impl Page {
-    pub const ALL: [Page; 7] =
-        [Page::Lighting, Page::Colours, Page::Keys, Page::Macros, Page::Screen, Page::Profiles, Page::Device];
+    pub const ALL: [Page; 8] = [Page::Lighting, Page::Colours, Page::Calibration, Page::Keys, Page::Macros, Page::Screen,
+                                Page::Profiles, Page::Device];
 
     pub fn title(self) -> String {
         tr(match self {
             Page::Screen => "Screen",
+            Page::Calibration => "Calibration",
             Page::Lighting => "Lighting",
             Page::Colours => "Colours",
             Page::Keys => "Keys",

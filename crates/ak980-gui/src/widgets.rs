@@ -86,9 +86,14 @@ pub fn level<'a>(value: u8, max: u8, on_change: impl Fn(u8) -> Message + 'a) -> 
 
 /// A wider slider over any integer range, with its value and unit.
 pub fn ranged<'a>(value: i32, lo: i32, hi: i32, unit: &str, on_change: impl Fn(i32) -> Message + 'a) -> Element<'a, Message> {
+    shown_as(value, lo, hi, format!("{value}{unit}"), on_change)
+}
+
+/// A slider over an integer range that shows its value as `shown` (say, hundredths as "1.25").
+pub fn shown_as<'a>(value: i32, lo: i32, hi: i32, shown: String, on_change: impl Fn(i32) -> Message + 'a) -> Element<'a, Message> {
     row![
         slider(lo..=hi, value, on_change).width(200).style(theme::slider_style),
-        text(format!("{value}{unit}")).size(theme::TEXT).width(52).font(fonts::MEDIUM),
+        text(shown).size(theme::TEXT).width(52).font(fonts::MEDIUM),
     ]
     .spacing(10)
     .align_y(Alignment::Center)

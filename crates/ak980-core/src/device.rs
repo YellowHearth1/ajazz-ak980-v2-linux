@@ -13,7 +13,7 @@
 //! ID 0 + command + byte sum in the last byte). The reply repeats the first three command bytes.
 
 use std::collections::BTreeMap;
-use std::sync::atomic::{AtomicU8, Ordering};
+use std::sync::RwLock;
 use std::thread::sleep;
 use std::time::{Duration, Instant};
 
@@ -76,26 +76,46 @@ impl Link {
     }
 }
 
-// ------------------------------------------------------------ white balance
+// ------------------------------------------------------------ colour calibration
 
-/// The white balance every keyboard opened from now on uses, red, green and blue in percent.
-static BALANCE: [AtomicU8; 3] = [AtomicU8::new(100), AtomicU8::new(100), AtomicU8::new(100)];
+/// How colours are adjusted for the keyboard's LEDs before they are sent: per channel a gain (the
+/// white balance: its red LEDs are stronger, so white looks pink) and a curve (how mid levels come
+/// out: 1.00 sends them as they are, more makes them darker, less brighter).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Calibration {
+    /// Red, green and blue, in percent of full strength.
+    pub gains: [u8; 3],
+    /// Red, green and blue curves, in hundredths (100 = 1.00).
+    pub curves: [u16; 3],
+}
 
-/// Sets the white balance (`settings.white_balance`) for the keyboards this process opens next.
-pub fn set_white_balance(gains: [u8; 3]) {
-    for (b, g) in BALANCE.iter().zip(gains) {
-        b.store(g.clamp(1, 100), Ordering::Relaxed);
+impl Calibration {
+    pub const NONE: Self = Self { gains: [100; 3], curves: [100; 3] };
+
+    /// `c` as the keyboard should get it.
+    pub fn apply(&self, c: [u8; 3]) -> [u8; 3] {
+        if *self == Self::NONE {
+            return c;
+        }
+        [0, 1, 2].map(|i| {
+            let curve = self.curves[i].clamp(25, 400) as f32 / 100.0;
+            let v = (c[i] as f32 / 255.0).powf(curve) * self.gains[i].min(100) as f32 / 100.0;
+            (v * 255.0).round().clamp(0.0, 255.0) as u8
+        })
     }
 }
 
-pub fn white_balance() -> [u8; 3] {
-    [0, 1, 2].map(|i| BALANCE[i].load(Ordering::Relaxed))
+/// The calibration every keyboard opened from now on uses.
+static CALIBRATION: RwLock<Calibration> = RwLock::new(Calibration::NONE);
+
+/// Sets the calibration (`settings.white_balance` and `settings.led_curves`) for the keyboards this
+/// process opens next.
+pub fn set_calibration(c: Calibration) {
+    *CALIBRATION.write().unwrap_or_else(|e| e.into_inner()) = c;
 }
 
-/// `c` with each channel scaled by its gain: the keyboard's LEDs are not equally strong, so an even
-/// white (255, 255, 255) can look pink; lowering the strong channels evens it out.
-pub fn balanced(c: [u8; 3], gains: [u8; 3]) -> [u8; 3] {
-    [0, 1, 2].map(|i| ((c[i] as u32 * gains[i].min(100) as u32 + 50) / 100) as u8)
+pub fn calibration() -> Calibration {
+    *CALIBRATION.read().unwrap_or_else(|e| e.into_inner())
 }
 
 /// The keyboard on a USB cable: every setting is available.
@@ -104,8 +124,8 @@ pub struct WiredKeyboard {
     lcd: Option<Box<dyn Hid>>,
     /// Pause before each configuration command, as in the vendor driver (`<cmd_delaytime value="35"/>`).
     pub delay: Duration,
-    /// Gains applied to every colour sent (effect colour, per-key colours, real-time frames).
-    pub balance: [u8; 3],
+    /// Applied to every colour sent (effect colour, per-key colours, real-time frames).
+    pub calibration: Calibration,
 }
 
 impl WiredKeyboard {
@@ -133,13 +153,13 @@ impl WiredKeyboard {
             None => None,
         };
         let mut kb = Self::with_transport(cmd, lcd);
-        kb.balance = white_balance();
+        kb.calibration = calibration();
         Ok(kb)
     }
 
     /// For tests: any [`Hid`] implementation. Colours go out as they are (no white balance).
     pub fn with_transport(cmd: Box<dyn Hid>, lcd: Option<Box<dyn Hid>>) -> Self {
-        Self { cmd, lcd, delay: Duration::from_millis(35), balance: [100; 3] }
+        Self { cmd, lcd, delay: Duration::from_millis(35), calibration: Calibration::NONE }
     }
 
     pub fn command_port(&mut self) -> &mut dyn Hid {
@@ -274,7 +294,7 @@ impl WiredKeyboard {
 
     pub fn set_lighting(&mut self, s: &LightSettings) -> Result<()> {
         let mut s = s.clone();
-        [s.r, s.g, s.b] = balanced([s.r, s.g, s.b], self.balance);
+        [s.r, s.g, s.b] = self.calibration.apply([s.r, s.g, s.b]);
         self.locked(|kb| {
             kb.begin()?;
             kb.command(OP_LIGHT, 0, 1, &[])?;
@@ -296,7 +316,7 @@ impl WiredKeyboard {
             let i = idx as usize * 4;
             if i + 3 < table.len() - 2 {
                 table[i] = idx;
-                table[i + 1..i + 4].copy_from_slice(&balanced(*rgb, self.balance));
+                table[i + 1..i + 4].copy_from_slice(&self.calibration.apply(*rgb));
             }
         }
         let n = table.len();
@@ -324,9 +344,9 @@ impl WiredKeyboard {
     /// until a configuration command replaces it. Reports closer than ~1 ms make it stall the bus.
     pub fn send_realtime(&mut self, table: &[u8; REALTIME_LEDS * 4], gap: Duration) -> Result<()> {
         let mut table = *table;
-        if self.balance != [100; 3] {
+        if self.calibration != Calibration::NONE {
             for entry in table.chunks_mut(4) {
-                let [r, g, b] = balanced([entry[1], entry[2], entry[3]], self.balance);
+                let [r, g, b] = self.calibration.apply([entry[1], entry[2], entry[3]]);
                 entry[1..4].copy_from_slice(&[r, g, b]);
             }
         }
@@ -733,11 +753,16 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn white_balance_scales_every_colour_sent() {
-        assert_eq!(balanced([255, 255, 255], [80, 100, 90]), [204, 255, 230]);
-        assert_eq!(balanced([10, 0, 255], [100, 100, 100]), [10, 0, 255]);
+    fn calibration_adjusts_every_colour_sent() {
+        let balance = Calibration { gains: [80, 100, 90], curves: [100; 3] };
+        assert_eq!(balance.apply([255, 255, 255]), [204, 255, 230]);
+        assert_eq!(Calibration::NONE.apply([10, 0, 255]), [10, 0, 255]);
+        // A curve above 1 darkens the middle and leaves the ends where they are
+        let curve = Calibration { gains: [100; 3], curves: [200, 100, 50] };
+        assert_eq!(curve.apply([128, 128, 128]), [64, 128, 181]);
+        assert_eq!(curve.apply([255, 0, 255]), [255, 0, 255]);
         let (mut kb, cmd, _) = keyboard();
-        kb.balance = [80, 100, 90];
+        kb.calibration = balance;
         let s = LightSettings { mode: 1, r: 255, g: 255, b: 255, brightness: 5, speed: 0, direction: 0, rainbow: false };
         kb.set_lighting(&s).unwrap();
         assert_eq!(&cmd.commands()[2][1..4], &[204, 255, 230]);

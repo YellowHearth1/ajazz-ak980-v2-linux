@@ -42,6 +42,7 @@ pub enum Message {
     Screen(pages::screen::Msg),
     Profiles(pages::profiles::Msg),
     Reminders(pages::reminders::Msg),
+    Calibration(pages::calibration::Msg),
     Device(pages::device::Msg),
 }
 
@@ -99,6 +100,7 @@ pub struct App {
     pub screen: pages::screen::State,
     pub profiles: pages::profiles::State,
     pub reminders: pages::reminders::State,
+    pub calibration: pages::calibration::State,
     pub device: pages::device::State,
 }
 
@@ -142,7 +144,7 @@ fn poll_status(read_battery: bool) -> Status {
 impl App {
     pub fn boot() -> (Self, Task<Message>) {
         let cfg = Config::load();
-        device::set_white_balance(cfg.settings.white_balance);
+        device::set_calibration(cfg.settings.calibration());
         let system_dark = true;
         let s = &cfg.settings;
         let theme = theme::activate(theme::roles_for(&s.theme, &s.accent, &s.colorway, &s.keyboard_model, system_dark));
@@ -168,6 +170,7 @@ impl App {
             screen: Default::default(),
             profiles: Default::default(),
             reminders: Default::default(),
+            calibration: Default::default(),
             device: Default::default(),
         };
         let tasks = Task::batch([
@@ -251,7 +254,12 @@ impl App {
     pub fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::Navigate(page) => {
+                let restore = (self.page == Page::Calibration && page != Page::Calibration && self.calibration.showing)
+                    .then(|| pages::calibration::give_lighting_back(self));
                 self.page = page;
+                if let Some(task) = restore {
+                    return task;
+                }
                 if page == Page::Device { pages::device::refresh() } else { Task::none() }
             }
             Message::Poll => {
@@ -280,7 +288,7 @@ impl App {
                     self.config_mtime = status.config_mtime;
                     let active = std::mem::take(&mut self.cfg.active);
                     self.cfg = Config::load();
-                    device::set_white_balance(self.cfg.settings.white_balance);
+                    device::set_calibration(self.cfg.settings.calibration());
                     if self.cfg.active != active {
                         self.profiles.rename.clear(); // a name typed for the profile that was active
                     }
@@ -347,6 +355,7 @@ impl App {
             Message::Screen(m) => pages::screen::update(self, m),
             Message::Profiles(m) => pages::profiles::update(self, m),
             Message::Reminders(m) => pages::reminders::update(self, m),
+            Message::Calibration(m) => pages::calibration::update(self, m),
             Message::Device(m) => pages::device::update(self, m),
         }
     }
@@ -365,6 +374,7 @@ impl App {
                 Task::none()
             }
             "screen" => pages::screen::set_text_color(self, c),
+            "calib" => pages::calibration::set_test_color(self, c),
             _ => Task::none(),
         }
     }
@@ -399,6 +409,7 @@ impl App {
     pub fn view(&self) -> Element<'_, Message> {
         let page = match self.page {
             Page::Screen => pages::screen::view(self),
+            Page::Calibration => pages::calibration::view(self),
             Page::Lighting => pages::lighting::view(self),
             Page::Colours => pages::colours::view(self),
             Page::Keys => pages::keys::view(self),

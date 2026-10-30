@@ -38,8 +38,6 @@ pub struct State {
     overlays: Overlays,
     /// Seconds into the typing shown for "Single on" and "Single off".
     typing: f32,
-    /// The keyboard shows plain white for the white balance.
-    white_test: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -57,13 +55,7 @@ pub enum Msg {
     OverlayNotifications(bool),
     Key(KeyEvent),
     Sent(Option<String>),
-    /// A channel of the white balance (0 red, 1 green, 2 blue) and its gain in percent.
-    Balance(usize, i32),
-    BalanceReset,
-    /// Show plain white on every key, to judge the balance; off gives the keyboard its lighting back.
-    WhiteTest(bool),
-    /// The keyboard showed white or got its lighting back (an error to show, if any).
-    WhiteShown(Option<String>),
+
 }
 
 fn wrap(m: Msg) -> Message {
@@ -186,25 +178,6 @@ pub fn update(app: &mut App, msg: Msg) -> Task<Message> {
             Task::none()
         }
         Msg::Key(KeyEvent::Erased(_) | KeyEvent::Picked(_)) => Task::none(),
-        Msg::Balance(channel, v) => {
-            let mut gains = app.cfg.settings.white_balance;
-            if let Some(g) = gains.get_mut(channel) {
-                *g = v.clamp(BALANCE_MIN, 100) as u8;
-            }
-            set_balance(app, gains)
-        }
-        Msg::BalanceReset => set_balance(app, [100; 3]),
-        Msg::WhiteTest(on) => {
-            app.lighting.white_test = on;
-            if on { show_white(app) } else { give_lighting_back(app) }
-        }
-        Msg::WhiteShown(error) => {
-            if let Some(e) = error {
-                app.lighting.white_test = false;
-                app.notify(e, true);
-            }
-            Task::none()
-        }
         Msg::Sent(error) => {
             app.lighting.sending = false;
             if let Some(e) = error {
@@ -215,89 +188,6 @@ pub fn update(app: &mut App, msg: Msg) -> Task<Message> {
             if std::mem::take(&mut app.lighting.dirty) { send(app) } else { Task::none() }
         }
     }
-}
-
-/// The lowest gain a channel of the white balance can take, in percent.
-const BALANCE_MIN: i32 = 40;
-
-/// New gains: kept in the settings, used for whatever is sent from now on, and shown at once on
-/// the white test or in the keyboard's own effect.
-fn set_balance(app: &mut App, gains: [u8; 3]) -> Task<Message> {
-    app.cfg.settings.white_balance = gains;
-    ak980_core::device::set_white_balance(gains);
-    app.save();
-    if app.lighting.white_test {
-        show_white(app)
-    } else if app.cfg.profile().light_source == LightSource::Firmware {
-        send(app)
-    } else {
-        Task::none()
-    }
-}
-
-/// Plain white on every key, as one real-time frame: it stays until the keyboard gets another
-/// command, and nothing is written to its memory.
-fn show_white(app: &mut App) -> Task<Message> {
-    if !app.wired() {
-        app.lighting.white_test = false;
-        return Task::none();
-    }
-    let gains = app.cfg.settings.white_balance;
-    Task::perform(
-        blocking(move || {
-            let (leds, _) = layout::positions();
-            let table = effects::to_bytes(&vec![[1.0; 3]; leds.len()], leds, 1.0);
-            WiredKeyboard::open()
-                .and_then(|mut kb| {
-                    kb.balance = gains;
-                    kb.send_realtime(&table, std::time::Duration::from_millis(2))
-                })
-                .err()
-                .map(|e| e.to_string())
-        }),
-        |r| wrap(Msg::WhiteShown(r.flatten())),
-    )
-}
-
-/// The profile's own lighting back on the keyboard after the white test.
-fn give_lighting_back(app: &mut App) -> Task<Message> {
-    if !app.wired() {
-        return Task::none();
-    }
-    let profile = app.cfg.profile().clone();
-    Task::perform(
-        blocking(move || {
-            WiredKeyboard::open()
-                .and_then(|mut kb| ak980_core::profiles::apply_lighting(&mut kb, &profile))
-                .err()
-                .map(|e| e.to_string())
-        }),
-        |r| wrap(Msg::WhiteShown(r.flatten())),
-    )
-}
-
-fn white_balance(app: &App) -> Element<'_, Message> {
-    let gains = app.cfg.settings.white_balance;
-    let mut rows = vec![];
-    for (i, name) in [tr("Red"), tr("Green"), tr("Blue")].into_iter().enumerate() {
-        rows.push(setting(name, None,
-                          widgets::ranged(gains[i] as i32, BALANCE_MIN, 100, "%", move |v| wrap(Msg::Balance(i, v)))));
-    }
-    let test = toggler(app.lighting.white_test).on_toggle_maybe(app.wired().then_some(|v| wrap(Msg::WhiteTest(v))))
-        .style(theme::switch);
-    rows.push(setting(tr("Show white on the keyboard"),
-                      Some(tr("Every key plain white, to compare; nothing is written to the keyboard.")), test));
-    if gains != [100; 3] {
-        rows.push(widgets::secondary_button(tr("Reset"), Some(wrap(Msg::BalanceReset))).into());
-    }
-    column![
-        section(tr("White balance"), card(rows)),
-        caption(tr("If white looks pink, lower red; if it looks blue or green, lower those. It applies to every colour \
-                    this app sends: the effect colour, the key colours (write them again) and PC effects. The \
-                    keyboard's rainbow effects use its own colours.")),
-    ]
-    .spacing(8)
-    .into()
 }
 
 /// Streams the PC effect from the window while no background agent does it.
@@ -492,7 +382,36 @@ pub fn view(app: &App) -> Element<'_, Message> {
         }
         LightSource::Firmware => page = page.push(firmware_effect(app)),
     }
-    page.push(white_balance(app)).into()
+    page.push(keyboard_keys()).into()
+}
+
+/// What the keyboard does on its own keys and no command from the computer reaches, such as the
+/// AJAZZ logo light, and where its colours are calibrated.
+fn keyboard_keys() -> Element<'static, Message> {
+    let combo = |keys: &str, what: String| -> Element<'static, Message> {
+        iced::widget::row![
+            iced::widget::text(keys.to_string()).font(crate::fonts::MEDIUM).size(theme::TEXT).width(150),
+            iced::widget::text(what).size(theme::TEXT).width(Fill),
+        ]
+        .spacing(12)
+        .into()
+    };
+    column![
+        section(tr("On the keyboard itself"), card(vec![
+            combo("Fn + Z", tr("The AJAZZ logo light next to the arrows, off and on. No command from the computer reaches it.")),
+            combo("Fn + X", tr("All of the keyboard's light, off and on")),
+            combo("Fn + Del", tr("The screen, off and on")),
+            combo(&format!("Fn + {}", tr("knob press")), tr("The knob between the volume and the screen's menu")),
+        ])),
+        iced::widget::row![
+            caption(tr("Colours on the keys not as on the screen?")),
+            widgets::secondary_button(tr("Calibration"), Some(Message::Navigate(Page::Calibration))),
+        ]
+        .spacing(12)
+        .align_y(iced::Alignment::Center),
+    ]
+    .spacing(8)
+    .into()
 }
 
 fn firmware_effect(app: &App) -> Element<'_, Message> {

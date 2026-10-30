@@ -231,6 +231,9 @@ pub struct Settings {
     /// Red, green and blue gains in percent for every colour sent to the keyboard: its red LEDs
     /// are stronger, so lowering red evens a white that looks pink.
     pub white_balance: [u8; 3],
+    /// Red, green and blue curves in hundredths (100 sends mid levels as they are), for the
+    /// calibration page; see `device::Calibration`.
+    pub led_curves: [u16; 3],
     pub reminders: Vec<Reminder>,
     /// Which AK980 the window draws: "screen" (the V2 with its screen and knob) or "keys" (Insert,
     /// Print Screen, Scroll Lock and Pause in their place). The drawing only.
@@ -245,6 +248,13 @@ pub struct Settings {
     pub overlay_notify_color: [u8; 3],
     /// Shows how long the charge lasts and how long charging takes, once whole cycles are measured.
     pub battery_insights: bool,
+}
+
+impl Settings {
+    /// The colour calibration these settings ask for.
+    pub fn calibration(&self) -> crate::device::Calibration {
+        crate::device::Calibration { gains: self.white_balance, curves: self.led_curves }
+    }
 }
 
 impl Default for Settings {
@@ -269,6 +279,7 @@ impl Default for Settings {
             colorway: "auto".into(),
             keyboard_model: "screen".into(),
             white_balance: [100, 100, 100],
+            led_curves: [100, 100, 100],
             reminders: Vec::new(),
             notifications: true,
             overlay_locks: false,
