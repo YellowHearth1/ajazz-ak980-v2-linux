@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.0.2 — unreleased (pre-release)
+## 0.0.2 — 2026-10-30 (pre-release)
 
 > **Written entirely by artificial intelligence.** The author needed software like this for the
 > keyboard but does not have the skills to write it, and asked Claude, a large language model made by
