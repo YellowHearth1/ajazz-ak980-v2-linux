@@ -143,8 +143,14 @@ pub struct Settings {
     pub host_fps: u32,
     pub animations: bool,
     pub close_to_tray: bool,
-    /// "auto" (follow the system), "graphite" or "lavender"; the window only.
+    /// "auto" (follow the system), "graphite", "lavender" or a Catppuccin flavour ("latte",
+    /// "frappe", "macchiato", "mocha"); the window only.
     pub theme: String,
+    /// The Catppuccin accent ("mauve", "blue", …); Graphite and Lavender keep their own.
+    pub accent: String,
+    /// How the keyboard is drawn: "auto" (the colourway that suits the theme), "graphite" or
+    /// "lavender".
+    pub colorway: String,
     /// Desktop notifications from the agent (battery, lost 2.4 GHz link).
     pub notifications: bool,
 }
@@ -166,6 +172,8 @@ impl Default for Settings {
             animations: true,
             close_to_tray: false,
             theme: "auto".into(),
+            accent: "mauve".into(),
+            colorway: "auto".into(),
             notifications: true,
         }
     }

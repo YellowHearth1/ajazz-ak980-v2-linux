@@ -109,7 +109,8 @@ impl App {
     pub fn boot() -> (Self, Task<Message>) {
         let cfg = Config::load();
         let system_dark = true;
-        let theme = theme::activate(theme::roles_for(&cfg.settings.theme, system_dark));
+        let s = &cfg.settings;
+        let theme = theme::activate(theme::roles_for(&s.theme, &s.accent, &s.colorway, system_dark));
         let app = Self {
             config_mtime: config::mtime(&cfg.path),
             cfg,
@@ -175,7 +176,8 @@ impl App {
     }
 
     pub fn apply_theme(&mut self) {
-        self.theme = theme::activate(theme::roles_for(&self.cfg.settings.theme, self.system_dark));
+        let s = &self.cfg.settings;
+        self.theme = theme::activate(theme::roles_for(&s.theme, &s.accent, &s.colorway, self.system_dark));
     }
 
     pub fn update(&mut self, message: Message) -> Task<Message> {

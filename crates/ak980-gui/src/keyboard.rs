@@ -161,7 +161,8 @@ impl<Message> canvas::Program<Message> for Keyboard<'_, Message> {
         let (cx, cy, cw, ch) = CASE_RECT;
         let case = Path::rounded_rectangle(at(cx, cy), Size::new(cw * s, ch * s), (12.0 * s).into());
         frame.fill(&case, k.case);
-        frame.stroke(&case, Stroke::default().with_color(k.case_edge).with_width(1.0));
+        // An outline that stands off the stage, so the case never melts into the page
+        frame.stroke(&case, Stroke::default().with_color(theme::case_outline(&r)).with_width(1.5));
 
         // The screen and the knob above the numpad
         let (sx, sy, sw, sh) = SCREEN_RECT;

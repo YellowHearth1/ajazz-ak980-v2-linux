@@ -1,4 +1,4 @@
-//! The two looks of the app, taken from the two colourways of the AK980 V2.
+//! The looks of the app: two taken from the two colourways of the AK980 V2, and Catppuccin's four.
 //!
 //! *Graphite* is the black case with light-grey and graphite caps and yellow Esc, Enter and space
 //! bar; *Lavender* the white case with white and lavender caps and sky-blue Esc, Enter and space
@@ -6,6 +6,11 @@
 //! grounds from the outermost in, `surface0..2` raised things, `overlay0..2` borders and quiet
 //! marks, `text`, `subtext1` and `subtext0` the type, and text on the accent is `base`. Every
 //! widget style below reads these roles and nothing else, so a colour cannot drift per widget.
+//!
+//! The Catppuccin flavours use the official palette (github.com/catppuccin/palette, MIT). Where a
+//! colour would read below WCAG AA in these roles (Latte's light accents, Frappé's subtext), it is
+//! moved towards the text colour just far enough, never further. The keyboard's colourway is chosen
+//! apart from the theme; the stage under the drawing adapts so the case always stands out.
 
 use std::sync::RwLock;
 
@@ -63,6 +68,59 @@ const fn hex(v: u32) -> Color {
     Color::from_rgb8((v >> 16) as u8, (v >> 8) as u8, v as u8)
 }
 
+/// The black AK980 V2: light-grey letters, graphite modifiers, yellow Esc, Enter and space bar.
+pub const GRAPHITE_KEYS: Colorway = Colorway {
+    case: hex(0x141416),
+    case_edge: hex(0x2A2B2F),
+    alpha: hex(0xD8D8D4),
+    alpha_side: hex(0xB6B6B1),
+    alpha_legend: hex(0x1B1B1D),
+    modifier: hex(0x7B7C7F),
+    modifier_side: hex(0x616265),
+    modifier_legend: hex(0x141416),
+    accent: hex(0xF3D230),
+    accent_side: hex(0xCFAF18),
+    accent_legend: hex(0x1B1B1D),
+    knob: hex(0x1C1C1F),
+};
+
+/// The white AK980 V2: white letters with lavender legends, lavender modifiers, sky-blue accents.
+pub const LAVENDER_KEYS: Colorway = Colorway {
+    case: hex(0xF4F4F7),
+    case_edge: hex(0xDCDBE4),
+    alpha: hex(0xFCFCFC),
+    alpha_side: hex(0xE2E1EA),
+    alpha_legend: hex(0x7466C6),
+    modifier: hex(0xA99CDF),
+    modifier_side: hex(0x8C7ECF),
+    modifier_legend: hex(0xFFFFFF),
+    accent: hex(0xB7D4E8),
+    accent_side: hex(0x93B8D3),
+    accent_legend: hex(0xFFFFFF),
+    knob: hex(0xF2F2F5),
+};
+
+/// WCAG relative luminance of an opaque colour.
+pub fn luminance(c: Color) -> f32 {
+    let lin = |v: f32| if v <= 0.04045 { v / 12.92 } else { ((v + 0.055) / 1.055).powf(2.4) };
+    0.2126 * lin(c.r) + 0.7152 * lin(c.g) + 0.0722 * lin(c.b)
+}
+
+/// WCAG contrast ratio, 1 to 21.
+pub fn contrast(a: Color, b: Color) -> f32 {
+    let (x, y) = (luminance(a), luminance(b));
+    (x.max(y) + 0.05) / (x.min(y) + 0.05)
+}
+
+/// `fg`, moved towards `toward` in small steps until it stands `min`:1 off every one of
+/// `grounds`; unchanged when it already does.
+pub fn readable(fg: Color, toward: Color, grounds: &[Color], min: f32) -> Color {
+    (0..=20)
+        .map(|step| mix(fg, toward, step as f32 / 20.0))
+        .find(|c| grounds.iter().all(|g| contrast(*c, *g) >= min))
+        .unwrap_or(toward)
+}
+
 pub const GRAPHITE: Roles = Roles {
     name: "graphite",
     dark: true,
@@ -82,20 +140,7 @@ pub const GRAPHITE: Roles = Roles {
     success: hex(0x8FCF7A),
     warning: hex(0xF0A35A),
     danger: hex(0xF07167),
-    keyboard: Colorway {
-        case: hex(0x141416),
-        case_edge: hex(0x2A2B2F),
-        alpha: hex(0xD8D8D4),
-        alpha_side: hex(0xB6B6B1),
-        alpha_legend: hex(0x1B1B1D),
-        modifier: hex(0x7B7C7F),
-        modifier_side: hex(0x616265),
-        modifier_legend: hex(0x141416),
-        accent: hex(0xF3D230),
-        accent_side: hex(0xCFAF18),
-        accent_legend: hex(0x1B1B1D),
-        knob: hex(0x1C1C1F),
-    },
+    keyboard: GRAPHITE_KEYS,
 };
 
 pub const LAVENDER: Roles = Roles {
@@ -117,32 +162,156 @@ pub const LAVENDER: Roles = Roles {
     success: hex(0x2E8B57),
     warning: hex(0xA86200),
     danger: hex(0xC4364C),
-    keyboard: Colorway {
-        case: hex(0xF4F4F7),
-        case_edge: hex(0xDCDBE4),
-        alpha: hex(0xFCFCFC),
-        alpha_side: hex(0xE2E1EA),
-        alpha_legend: hex(0x7466C6),
-        modifier: hex(0xA99CDF),
-        modifier_side: hex(0x8C7ECF),
-        modifier_legend: hex(0xFFFFFF),
-        accent: hex(0xB7D4E8),
-        accent_side: hex(0x93B8D3),
-        accent_legend: hex(0xFFFFFF),
-        knob: hex(0xF2F2F5),
-    },
+    keyboard: LAVENDER_KEYS,
 };
 
-/// "auto" follows the system's light or dark preference.
-pub const CHOICES: [&str; 3] = ["auto", "graphite", "lavender"];
+/// A Catppuccin flavour: the 14 accents in `ACCENTS` order, then text, subtext1, subtext0,
+/// overlay2, overlay1, overlay0, surface2, surface1, surface0, base, mantle and crust.
+pub struct Flavour {
+    pub id: &'static str,
+    pub dark: bool,
+    pub colors: [u32; 26],
+}
 
-pub fn roles_for(choice: &str, system_dark: bool) -> Roles {
-    match choice {
+/// Catppuccin's accents, in its order; the names are English and translated where shown.
+pub const ACCENTS: [(&str, &str); 14] = [
+    ("rosewater", "Rosewater"), ("flamingo", "Flamingo"), ("pink", "Pink"), ("mauve", "Mauve"), ("red", "Red"),
+    ("maroon", "Maroon"), ("peach", "Peach"), ("yellow", "Yellow"), ("green", "Green"), ("teal", "Teal"),
+    ("sky", "Sky"), ("sapphire", "Sapphire"), ("blue", "Blue"), ("lavender", "Lavender"),
+];
+
+#[rustfmt::skip]
+pub const FLAVOURS: [Flavour; 4] = [
+    Flavour { id: "latte", dark: false, colors: [
+        0xdc8a78, 0xdd7878, 0xea76cb, 0x8839ef, 0xd20f39, 0xe64553, 0xfe640b, 0xdf8e1d, 0x40a02b, 0x179299,
+        0x04a5e5, 0x209fb5, 0x1e66f5, 0x7287fd, 0x4c4f69, 0x5c5f77, 0x6c6f85, 0x7c7f93, 0x8c8fa1, 0x9ca0b0,
+        0xacb0be, 0xbcc0cc, 0xccd0da, 0xeff1f5, 0xe6e9ef, 0xdce0e8] },
+    Flavour { id: "frappe", dark: true, colors: [
+        0xf2d5cf, 0xeebebe, 0xf4b8e4, 0xca9ee6, 0xe78284, 0xea999c, 0xef9f76, 0xe5c890, 0xa6d189, 0x81c8be,
+        0x99d1db, 0x85c1dc, 0x8caaee, 0xbabbf1, 0xc6d0f5, 0xb5bfe2, 0xa5adce, 0x949cbb, 0x838ba7, 0x737994,
+        0x626880, 0x51576d, 0x414559, 0x303446, 0x292c3c, 0x232634] },
+    Flavour { id: "macchiato", dark: true, colors: [
+        0xf4dbd6, 0xf0c6c6, 0xf5bde6, 0xc6a0f6, 0xed8796, 0xee99a0, 0xf5a97f, 0xeed49f, 0xa6da95, 0x8bd5ca,
+        0x91d7e3, 0x7dc4e4, 0x8aadf4, 0xb7bdf8, 0xcad3f5, 0xb8c0e0, 0xa5adcb, 0x939ab7, 0x8087a2, 0x6e738d,
+        0x5b6078, 0x494d64, 0x363a4f, 0x24273a, 0x1e2030, 0x181926] },
+    Flavour { id: "mocha", dark: true, colors: [
+        0xf5e0dc, 0xf2cdcd, 0xf5c2e7, 0xcba6f7, 0xf38ba8, 0xeba0ac, 0xfab387, 0xf9e2af, 0xa6e3a1, 0x94e2d5,
+        0x89dceb, 0x74c7ec, 0x89b4fa, 0xb4befe, 0xcdd6f4, 0xbac2de, 0xa6adc8, 0x9399b2, 0x7f849c, 0x6c7086,
+        0x585b70, 0x45475a, 0x313244, 0x1e1e2e, 0x181825, 0x11111b] },
+];
+
+/// The roles of a Catppuccin flavour with one of its accents.
+fn catppuccin(f: &Flavour, accent: &str) -> Roles {
+    let c = |i: usize| hex(f.colors[i]);
+    let (text, overlay0, surface0, base, mantle, crust) = (c(14), c(19), c(22), c(23), c(24), c(25));
+    let mut r = Roles {
+        name: f.id,
+        dark: f.dark,
+        crust,
+        mantle,
+        base,
+        // Raised things as in Catppuccin, with the controls half a step between surface0 and surface1
+        surface0,
+        surface1: mix(surface0, c(21), 0.5),
+        surface2: c(21),
+        overlay0: c(20),
+        overlay1: c(17),
+        subtext0: c(16),
+        subtext1: c(15),
+        text,
+        accent: c(ACCENTS.iter().position(|(id, _)| *id == accent).unwrap_or(3)),
+        second: c(13),
+        success: c(8),
+        warning: c(6),
+        danger: c(4),
+        keyboard: if f.dark { GRAPHITE_KEYS } else { LAVENDER_KEYS },
+    };
+    if !f.dark {
+        // Latte: cards brighter than the page, as in Lavender; Latte's own surfaces become the controls
+        (r.mantle, r.base, r.surface0, r.surface1, r.surface2, r.overlay0) = (crust, mantle, base, crust, surface0, overlay0);
+    }
+    // Moved towards the text colour only as far as WCAG AA asks: 4.5:1 for text, 3:1 for marks
+    let grounds = [r.base, r.mantle, r.surface0, r.surface1];
+    r.subtext1 = readable(r.subtext1, text, &grounds, 4.5);
+    r.subtext0 = readable(r.subtext0, text, &grounds, 4.5);
+    r.overlay1 = readable(r.overlay1, text, &grounds, 3.0);
+    for status in [&mut r.success, &mut r.warning, &mut r.danger] {
+        *status = readable(*status, text, &[r.surface0], 3.0);
+    }
+    r.accent = readable(r.accent, text, &[r.base], 4.5); // text on the accent is `base`
+    r
+}
+
+/// The themes in the order the window offers them; "auto" follows the system's light or dark
+/// preference.
+pub const THEMES: [(&str, &str); 7] = [
+    ("auto", "As the system"),
+    ("graphite", "Graphite"),
+    ("lavender", "Lavender"),
+    ("latte", "Catppuccin Latte"),
+    ("frappe", "Catppuccin Frappé"),
+    ("macchiato", "Catppuccin Macchiato"),
+    ("mocha", "Catppuccin Mocha"),
+];
+
+/// How the keyboard is drawn: the colourway that suits the theme, or one of the AK980 V2's two.
+pub const COLORWAYS: [(&str, &str); 3] = [("auto", "As the theme"), ("graphite", "Graphite"), ("lavender", "Lavender")];
+
+pub fn is_catppuccin(theme: &str) -> bool {
+    FLAVOURS.iter().any(|f| f.id == theme)
+}
+
+pub fn roles_for(theme: &str, accent: &str, colorway: &str, system_dark: bool) -> Roles {
+    let mut r = match theme {
         "graphite" => GRAPHITE,
         "lavender" => LAVENDER,
-        _ if system_dark => GRAPHITE,
-        _ => LAVENDER,
+        id => match FLAVOURS.iter().find(|f| f.id == id) {
+            Some(f) => catppuccin(f, accent),
+            None if system_dark => GRAPHITE,
+            None => LAVENDER,
+        },
+    };
+    r.keyboard = match colorway {
+        "graphite" => GRAPHITE_KEYS,
+        "lavender" => LAVENDER_KEYS,
+        _ if r.dark => GRAPHITE_KEYS,
+        _ => LAVENDER_KEYS,
+    };
+    r
+}
+
+/// The theme made from a keyboard colourway, for "Match the theme to the keyboard".
+pub fn theme_for_colorway(colorway: &str) -> Option<&'static str> {
+    match colorway {
+        "graphite" => Some("graphite"),
+        "lavender" => Some("lavender"),
+        _ => None,
     }
+}
+
+/// How far the case's colour must stand off the stage for the case to read as a shape.
+const STAGE_SEPARATION: f32 = 1.4;
+
+/// The ground under the keyboard drawing: the theme's quiet ground, unless the case would melt
+/// into it; then the theme's ground nearest to it that sets the case apart.
+pub fn stage_ground(r: &Roles) -> Color {
+    let case = r.keyboard.case;
+    let quiet = mix(r.base, r.crust, 0.6);
+    if contrast(case, quiet) >= STAGE_SEPARATION {
+        return quiet;
+    }
+    let grounds = [r.base, r.mantle, r.crust, r.surface0, r.surface1, r.surface2, r.overlay0];
+    grounds
+        .into_iter()
+        .filter(|g| contrast(case, *g) >= STAGE_SEPARATION)
+        .min_by(|a, b| contrast(*a, quiet).total_cmp(&contrast(*b, quiet)))
+        .unwrap_or_else(|| grounds.into_iter().max_by(|a, b| contrast(case, *a).total_cmp(&contrast(case, *b))).unwrap_or(quiet))
+}
+
+/// The case's outline: its edge colour moved towards the theme's text until it stands 3:1 off the
+/// stage, WCAG's contrast for the outline of a graphic.
+pub fn case_outline(r: &Roles) -> Color {
+    readable(r.keyboard.case_edge, r.text, &[stage_ground(r)], 3.0)
 }
 
 static CURRENT: RwLock<Roles> = RwLock::new(GRAPHITE);
@@ -251,11 +420,11 @@ pub fn card(_: &Theme) -> container::Style {
     }
 }
 
-/// The stage the keyboard drawing sits on.
+/// The stage the keyboard drawing sits on, set off from the case whatever the colourway.
 pub fn stage(_: &Theme) -> container::Style {
     let r = roles();
     container::Style {
-        background: Some(mix(r.base, r.crust, 0.6).into()),
+        background: Some(stage_ground(&r).into()),
         border: border(alpha(r.overlay0, 0.35), 1.0, RADIUS),
         ..Default::default()
     }
@@ -530,16 +699,6 @@ type _Palette = palette::Palette;
 mod tests {
     use super::*;
 
-    fn luminance(c: Color) -> f32 {
-        let lin = |v: f32| if v <= 0.04045 { v / 12.92 } else { ((v + 0.055) / 1.055).powf(2.4) };
-        0.2126 * lin(c.r) + 0.7152 * lin(c.g) + 0.0722 * lin(c.b)
-    }
-
-    fn contrast(a: Color, b: Color) -> f32 {
-        let (x, y) = (luminance(a), luminance(b));
-        (x.max(y) + 0.05) / (x.min(y) + 0.05)
-    }
-
     #[test]
     fn text_is_readable_in_both_themes() {
         for r in [GRAPHITE, LAVENDER] {
@@ -558,6 +717,71 @@ mod tests {
             for (cap, legend, n) in [(k.alpha, k.alpha_legend, "alpha"), (k.modifier, k.modifier_legend, "modifier")] {
                 assert!(contrast(cap, legend) >= 2.0, "{} {n} legends: {}", r.name, contrast(cap, legend));
             }
+        }
+    }
+
+    /// Every theme the window offers, with every accent a Catppuccin flavour can take.
+    fn every_theme() -> Vec<Roles> {
+        let mut all = vec![GRAPHITE, LAVENDER];
+        for f in &FLAVOURS {
+            all.extend(ACCENTS.iter().map(|(a, _)| roles_for(f.id, a, "auto", true)));
+        }
+        all
+    }
+
+    #[test]
+    fn every_theme_and_accent_meets_wcag_aa() {
+        for r in every_theme() {
+            let n = format!("{} with accent {:?}", r.name, r.accent);
+            for (ground, g) in [(r.base, "base"), (r.mantle, "mantle"), (r.surface0, "surface0"), (r.surface1, "surface1")] {
+                for (fg, f, min) in [(r.text, "text", 4.5), (r.subtext1, "subtext1", 4.5), (r.subtext0, "subtext0", 4.5),
+                                     (r.overlay1, "overlay1", 3.0)] {
+                    assert!(contrast(fg, ground) >= min, "{n}: {f} on {g} is {:.2}", contrast(fg, ground));
+                }
+            }
+            // Hovered buttons and toasts sit on surface2
+            assert!(contrast(r.text, r.surface2) >= 4.5, "{n}: text on surface2 {:.2}", contrast(r.text, r.surface2));
+            assert!(contrast(r.base, r.accent) >= 4.5, "{n}: text on the accent {:.2}", contrast(r.base, r.accent));
+            for (c, s) in [(r.danger, "danger"), (r.success, "success"), (r.warning, "warning")] {
+                assert!(contrast(c, r.surface0) >= 3.0, "{n}: {s} {:.2}", contrast(c, r.surface0));
+            }
+        }
+    }
+
+    #[test]
+    fn catppuccin_keeps_its_colours_where_it_can() {
+        // Mocha needs no change, so its colours are the palette's own
+        let mocha = roles_for("mocha", "mauve", "auto", true);
+        assert_eq!((mocha.accent, mocha.text, mocha.base), (hex(0xcba6f7), hex(0xcdd6f4), hex(0x1e1e2e)));
+        // Latte's yellow is too light under white text: darkened, not replaced
+        let latte = roles_for("latte", "yellow", "auto", false);
+        assert!(luminance(latte.accent) < luminance(hex(0xdf8e1d)) && latte.accent.r > latte.accent.b);
+        assert!(!latte.dark && roles_for("latte", "nonsense", "auto", false).accent != Color::BLACK);
+    }
+
+    #[test]
+    fn the_keyboard_stands_out_on_every_theme() {
+        for theme in THEMES.iter().map(|(t, _)| *t).filter(|t| *t != "auto") {
+            for (colorway, _) in COLORWAYS {
+                let r = roles_for(theme, "mauve", colorway, true);
+                let ground = stage_ground(&r);
+                assert!(contrast(r.keyboard.case, ground) >= STAGE_SEPARATION, "{theme}/{colorway}: case on stage {:.2}",
+                        contrast(r.keyboard.case, ground));
+                assert!(contrast(case_outline(&r), ground) >= 3.0, "{theme}/{colorway}: outline {:.2}",
+                        contrast(case_outline(&r), ground));
+            }
+        }
+        // "As the theme" keeps the pairing the two own themes were made with
+        assert_eq!(roles_for("graphite", "mauve", "auto", true).keyboard.case, GRAPHITE_KEYS.case);
+        assert_eq!(roles_for("latte", "mauve", "auto", false).keyboard.case, LAVENDER_KEYS.case);
+    }
+
+    #[test]
+    fn every_label_is_translated() {
+        // These tables are translated where they are shown, so the source scan in ak980-core misses them
+        let uk = ak980_core::i18n::catalog("uk").expect("the Ukrainian catalog");
+        for (_, label) in THEMES.iter().chain(&COLORWAYS).chain(&ACCENTS) {
+            assert!(uk.contains_key(*label), "{label:?} has no Ukrainian translation");
         }
     }
 

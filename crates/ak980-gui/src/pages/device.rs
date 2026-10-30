@@ -6,7 +6,7 @@ use ak980_core::i18n::{self, tr, LANGUAGES};
 use ak980_core::lighting::SLEEP_CHOICES;
 use ak980_core::service::{self, Method};
 use ak980_core::{paths, permissions, tr};
-use iced::widget::{button, column, pick_list, row, text, toggler};
+use iced::widget::{button, column, container, pick_list, row, space, text, toggler, tooltip};
 use iced::{Alignment, Element, Fill, Task};
 
 use crate::app::{blocking, App, Message};
@@ -36,6 +36,10 @@ pub enum Msg {
     Methods(Vec<Method>, Vec<String>),
     Service(String, bool),
     Theme(&'static str),
+    Accent(&'static str),
+    Colorway(&'static str),
+    /// The theme made from the keyboard's colourway.
+    MatchTheme,
     Language(Choice<&'static str>),
     Notifications(bool),
     Open(&'static str),
@@ -119,6 +123,20 @@ pub fn update(app: &mut App, msg: Msg) -> Task<Message> {
         Msg::Theme(t) => {
             app.cfg.settings.theme = t.to_string();
             app.apply_theme();
+        }
+        Msg::Accent(a) => {
+            app.cfg.settings.accent = a.to_string();
+            app.apply_theme();
+        }
+        Msg::Colorway(c) => {
+            app.cfg.settings.colorway = c.to_string();
+            app.apply_theme();
+        }
+        Msg::MatchTheme => {
+            if let Some(t) = theme::theme_for_colorway(&app.cfg.settings.colorway) {
+                app.cfg.settings.theme = t.to_string();
+                app.apply_theme();
+            }
         }
         Msg::Language(c) => {
             app.cfg.settings.language = c.value.to_string();
@@ -209,19 +227,43 @@ pub fn view(app: &App) -> Element<'_, Message> {
         agent.push(setting(title, Some(tr(m.detail)), control));
     }
 
-    let themes = vec![("auto", tr("As the system")), ("graphite", tr("Graphite")), ("lavender", tr("Lavender"))];
-    let current_theme = crate::theme::CHOICES.iter().copied().find(|c| *c == s.theme).unwrap_or("auto");
+    let themes: Vec<Choice<&'static str>> = theme::THEMES.iter().map(|(id, name)| Choice::new(*id, tr(name))).collect();
+    let current_theme = themes.iter().find(|c| c.value == s.theme).or(themes.first()).cloned();
+    let colorways: Vec<(&'static str, String)> = theme::COLORWAYS.iter().map(|(id, name)| (*id, tr(name))).collect();
+    let current_colorway = theme::COLORWAYS.iter().map(|(id, _)| *id).find(|c| *c == s.colorway).unwrap_or("auto");
+    // Offered only when it would change something: a colourway is chosen and the theme differs
+    let match_theme = theme::theme_for_colorway(&s.colorway)
+        .filter(|t| *t != s.theme)
+        .map(|_| widgets::secondary_button(tr("Match the theme"), Some(wrap(Msg::MatchTheme))));
     let mut langs: Vec<Choice<&'static str>> = vec![Choice::new("auto", tr("System language"))];
     langs.extend(LANGUAGES.iter().map(|(c, n)| Choice::new(*c, n.to_string())));
     let current_lang = langs.iter().find(|c| c.value == s.language).cloned();
-    let appearance = vec![
-        setting(tr("Theme"), Some(tr("Graphite and Lavender follow the two colourways of the AK980 V2.")),
-                segmented(themes, current_theme, |t| wrap(Msg::Theme(t)))),
+    let mut appearance = vec![setting(
+        tr("Theme"),
+        Some(tr("Graphite and Lavender follow the two colourways of the AK980 V2. Catppuccin comes in four flavours, \
+                 from light Latte to dark Mocha.")),
+        pick_list(themes, current_theme, |c| wrap(Msg::Theme(c.value))).style(theme::pick).menu_style(theme::menu)
+            .width(240),
+    )];
+    if theme::is_catppuccin(&s.theme) {
+        appearance.push(setting(tr("Accent"), None, accent_swatches(app)));
+    }
+    let mut keyboard_colours =
+        row![segmented(colorways, current_colorway, |c| wrap(Msg::Colorway(c)))].spacing(8).align_y(Alignment::Center);
+    if let Some(button) = match_theme {
+        keyboard_colours = keyboard_colours.push(button);
+    }
+    appearance.push(setting(
+        tr("Keyboard colours"),
+        Some(tr("How the keyboard on every page is coloured, apart from the theme.")),
+        keyboard_colours,
+    ));
+    appearance.extend([
         setting(tr("Language"), None, pick_list(langs, current_lang, |c| wrap(Msg::Language(c))).style(theme::pick)
             .menu_style(theme::menu).width(200)),
         setting(tr("Notifications"), Some(tr("From the agent: low battery, a lost 2.4 GHz link.")),
                 toggler(s.notifications).on_toggle(|v| wrap(Msg::Notifications(v))).style(theme::switch)),
-    ];
+    ]);
     let about = vec![
         setting(format!("{} {}", ak980_core::APP_TITLE, ak980_core::VERSION),
                 Some(tr("Unofficial software, not affiliated with AJAZZ.")),
@@ -244,4 +286,20 @@ pub fn view(app: &App) -> Element<'_, Message> {
     .width(Fill)
     .align_x(Alignment::Start)
     .into()
+}
+
+/// Catppuccin's accents as swatches, each in the colour it will have in this flavour.
+fn accent_swatches(app: &App) -> Element<'_, Message> {
+    let s = &app.cfg.settings;
+    let mut swatches = row![].spacing(6);
+    for (id, name) in theme::ACCENTS {
+        let color = theme::roles_for(&s.theme, id, &s.colorway, app.system_dark).accent;
+        let chip = container(space()).width(22).height(22).style(theme::swatch(color, s.accent == id));
+        let pick = button(chip).padding(0).style(theme::flat).on_press(wrap(Msg::Accent(id)));
+        swatches = swatches.push(
+            tooltip(pick, container(text(tr(name)).size(theme::SMALL)).padding([4, 8]).style(theme::card),
+                    tooltip::Position::Bottom),
+        );
+    }
+    swatches.into()
 }
