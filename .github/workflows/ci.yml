@@ -44,8 +44,12 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Build the package from this commit, as git clone + makepkg -si would
+        shell: bash
         run: |
-          pacman -Syu --noconfirm --needed base-devel cargo git
+          pacman -Syu --noconfirm --needed base-devel git
+          # What makepkg -s installs first: the dependencies the PKGBUILD names
+          . ./PKGBUILD
+          pacman -S --noconfirm --needed "${depends[@]}" "${makedepends[@]}"
           useradd -m builder
           chown -R builder .
           su builder -c "makepkg --noconfirm -f"

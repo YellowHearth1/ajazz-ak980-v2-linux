@@ -1,0 +1,40 @@
+name: Package again
+
+# Builds the pacman package of a release that is out already from its tag and attaches it to that
+# release, for one whose own package build failed: Actions → Package again → the tag.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag of the release, such as v0.0.4
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  arch-package:
+    runs-on: ubuntu-24.04
+    container: archlinux:latest
+    env:
+      TAG: ${{ inputs.tag }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag }}
+      - name: Build the package from the tagged commit, as git clone + makepkg -si would
+        shell: bash
+        run: |
+          pacman -Syu --noconfirm --needed base-devel git github-cli
+          # What makepkg -s installs first: the dependencies the PKGBUILD names
+          . ./PKGBUILD
+          pacman -S --noconfirm --needed "${depends[@]}" "${makedepends[@]}"
+          useradd -m builder
+          chown -R builder .
+          su builder -c "makepkg --noconfirm -f"
+          ls -l *.pkg.tar.zst
+          test "$(ls *.pkg.tar.zst | wc -l)" -eq 1
+      - name: Attach it to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$TAG" *.pkg.tar.zst --clobber --repo "$GITHUB_REPOSITORY"
