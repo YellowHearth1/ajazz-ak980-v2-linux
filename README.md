@@ -26,9 +26,9 @@ only exists for Windows; this app covers what it does and adds what it could not
 keeps itself in sync with your system, lighting effects can be computed on the PC (music spectrum,
 reactive typing, fire), and profiles switch when a game starts.
 
-Version 0.0.2 is a rewrite in Rust (the window uses [iced](https://iced.rs)), checked on a real
-AK980 V2 over the 2.4 GHz receiver and over the cable. 0.0.1, the Python version, is outdated: the
-project has gone another way, and it is no longer developed.
+Since 0.0.2 the app is written in Rust (the window uses [iced](https://iced.rs)) and checked on a
+real AK980 V2 over the 2.4 GHz receiver and over the cable. 0.0.1, the Python version, is outdated:
+the project has gone another way, and it is no longer developed.
 
 ![Lighting effects computed on the PC, previewed on the keyboard itself](docs/screenshots/en/lighting-lavender.png)
 
@@ -81,7 +81,21 @@ keyboard. What the vendor's Windows app does not do:
 
 ## Install
 
-### Arch Linux, Artix and derivatives
+### Arch Linux, Artix and derivatives: the ready-made package
+
+Each [release](https://github.com/yellowhearth1/ajazz-ak980-v2-linux/releases) has packages built
+for pacman: `ajazz-ak980-v2-linux-<version>-x86_64.pkg.tar.zst`, and one for each init system's
+system service (`-dinit`, `-openrc`, `-runit`, `-s6`; the systemd units are in the main package).
+Download the main package, and the one for your init system if you want the system service, then:
+
+```bash
+sudo pacman -U ajazz-ak980-v2-linux-*-x86_64.pkg.tar.zst
+```
+
+pacman brings in what the app needs from your distribution's repositories. A graphical package
+installer that opens `.pkg.tar.zst` files (pamac, for one) installs it on a double click too.
+
+### Arch Linux, Artix and derivatives: build it yourself
 
 ```bash
 git clone https://github.com/yellowhearth1/ajazz-ak980-v2-linux

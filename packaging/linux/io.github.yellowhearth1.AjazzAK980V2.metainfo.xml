@@ -55,7 +55,7 @@
         calibration page for the LEDs' colours; three more AK980 colourways and themes; a colour wheel.</p>
       </description>
     </release>
-    <release version="0.0.2" date="2026-10-30" type="development">
+    <release version="0.0.2" date="2026-10-30">
       <description>
         <p>Written in Rust: a new window with two themes taken from the AK980 V2's colourways, a smaller
         package, and a more reliable 2.4 GHz receiver, with a record of the link, a way to reconnect it

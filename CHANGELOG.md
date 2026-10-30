@@ -2,6 +2,8 @@
 
 ## 0.0.3 — unreleased
 
+- Packages for pacman: every release now carries `.pkg.tar.zst` packages for Arch, Artix and
+  derivatives, installed with `sudo pacman -U`, next to the AppImage and the source archive.
 - Clock: the agent sets the keyboard's clock once a week by default instead of on every connection
   and every hour. Every clock packet shows the AK980 V2's clock page, so the animation used to give
   way to the clock after each start of the computer. Hourly, daily, weekly or only by hand on the

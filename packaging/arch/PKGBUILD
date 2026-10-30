@@ -11,7 +11,7 @@ pkgname=(ajazz-ak980-v2-linux
          ajazz-ak980-v2-linux-runit
          ajazz-ak980-v2-linux-s6)
 pkgver=0.0.3
-pkgrel=2
+pkgrel=3
 pkgdesc="Ajazz AK980 V2 | Software for Linux: screen clock and GIFs, lighting, PC lighting effects, keys, macros, profiles"
 arch=(x86_64 aarch64)
 url="https://github.com/yellowhearth1/ajazz-ak980-v2-linux"
@@ -45,7 +45,9 @@ package_ajazz-ak980-v2-linux() {
   optdepends=('libpulse: music lighting effects through parec'
               'pipewire: music lighting effects through pw-record'
               'polkit: allow keyboard access, reconnect the receiver and set up system services from the app'
-              'libnotify: notifications from the background agent (low battery, lost 2.4 GHz link)'
+              'libnotify: notifications from the background agent (low battery, lost 2.4 GHz link, reminders)'
+              'dbus: the keyboard flashes when a desktop notification comes (dbus-monitor)'
+              'xdg-utils: launcher keys that open links'
               'xdg-desktop-portal: file dialogs of the desktop')
   backup=(etc/ak980/agent.conf)
   install=ajazz-ak980-v2-linux.install
