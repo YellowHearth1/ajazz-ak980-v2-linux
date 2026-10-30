@@ -361,6 +361,7 @@ impl App {
             iced::time::every(Duration::from_secs(2)).map(|_| Message::Poll),
             iced::system::theme_changes().map(Message::SystemTheme),
             iced::window::close_requests().map(|_| Message::CloseRequested),
+            pages::macros::subscription(self),
         ];
         if pages::lighting::animating(self) || pages::screen::animating(self) {
             subs.push(iced::time::every(Duration::from_millis(33)).map(Message::Tick));
