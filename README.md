@@ -27,16 +27,38 @@ still being done. 0.0.1, the Python version, stays available on the releases pag
 | Lighting effects computed on the PC, streamed at 30 fps | yes | no (firmware) |
 | Key remapping on the base and Fn layers: keys, shortcuts, mouse, media, macros, several keys, programs and links | yes | no (firmware) |
 | Up to 100 macros, recorded from the keyboard or typed in | yes | no (firmware) |
-| Profiles, switched by hand or automatically for a game | yes | lighting stays |
+| Profiles, switched by hand, by a key or automatically for a game | yes | lighting stays |
 | Win, Alt+Tab and Alt+F4 locks, Fn as a switch, sleep timer, key response | yes | no (firmware) |
-| Battery level | no (the keyboard does not report it) | yes |
+| Battery level | read off the measured charging | yes |
+| How long the charge lasts, charging time, the battery's condition (measured from whole cycles) | yes | yes |
 
 The keyboard only accepts configuration over the cable; the vendor's driver has the same limit.
 Over the dongle it takes the time and reports its battery.
 
 PC effects: rainbow wave, colour drift, breathing, starlight, reactive keys (pressed key, ripple or
-cross), fire, music spectrum and music pulse. The preview in the app runs the same code that drives
-the keyboard, so what you see is what the keys show.
+cross), fire, music spectrum and music pulse, a system monitor (processor load, memory in use or the
+processor's temperature as a bar on the number row, F1–F12 or the whole board) and a typing heat
+map. Over any of them, Caps Lock and Num Lock can light up while they are on, and the keyboard can
+flash when a desktop notification comes (the app only sees that one came, never its text). The
+preview in the app runs the same code that drives the keyboard, so what you see is what the keys
+show.
+
+### Beyond the vendor's app
+
+Everything here goes through the commands of the vendor's own driver; nothing new is sent to the
+keyboard. What the vendor's Windows app does not do:
+
+- lighting computed on the PC: music, typing, the system monitor, the heat map, lock keys and
+  notifications over any effect;
+- profile keys: a key (say Fn+1, Fn+2) switches to the next or to a given profile, so every profile
+  is a layer of its own; profiles also switch by themselves while a game runs;
+- program, link and profile keys that keep working with the window closed (the agent handles them);
+- running text over a picture, zoom and pan, turning, tones, a hue shift, sharp pixels for pixel
+  art, playing backward or there and back, a delay for every frame;
+- battery measurements: how long a full charge lasts and how long charging takes, from whole cycles
+  the agent has seen, the level while charging on the cable in wired mode, and how the battery ages;
+- the 2.4 GHz link record, *Reconnect the receiver*, notifications for a lost link or a low battery,
+  and `ak980 status --waybar` for a panel.
 
 ## Install
 
@@ -143,13 +165,13 @@ contrast (WCAG AA).
 
 | | |
 |---|---|
-| ![Screen](docs/screenshots/en/screen-graphite.png) | **Screen.** Open a GIF, a picture or a folder of numbered frames. Fit, fill or stretch it; adjust brightness, contrast and saturation; change the speed or give every frame the same delay; cut frames or keep every Nth one to fit the 140-frame limit; add a caption. The strip shows every frame with its delay: select one to change its delay or delete it. The preview is the exact 16-bit image the panel will show. Uploading takes about 0.15 s per 4 KiB page. Every upload is kept under *Earlier uploads*, because the keyboard cannot give an animation back. |
+| ![Screen](docs/screenshots/en/screen-graphite.png) | **Screen.** Open a GIF, a picture or a folder of numbered frames. Fit, fill or stretch it; adjust brightness, contrast and saturation; change the speed or give every frame the same delay; cut frames or keep every Nth one to fit the 140-frame limit; turn it, zoom into a part and move it, keep sharp pixels for pixel art, change its tone or shift its hues; play it forward, backward or there and back; add a caption, still or running across the screen, with a shadow or an outline. The strip shows every frame with its delay: select one to change its delay or delete it. The preview is the exact 16-bit image the panel will show. Uploading takes about 0.15 s per 4 KiB page. Every upload is kept under *Earlier uploads*, because the keyboard cannot give an animation back. |
 | ![Lighting](docs/screenshots/en/lighting-graphite.png) | **Lighting.** *Keyboard effects* are the 19 effects of the firmware; they stay when the computer is off. *PC effects* are computed here and streamed to the keys; they run while the app or the agent runs. |
 | ![Colours](docs/screenshots/en/colours-graphite.png) | **Colours.** Paint keys: left button paints (drag across keys), right button picks a key's colour, middle button clears it. Fill, rainbow, gradient, WASD, arrows, F row and numpad in one click. The colours are stored in the keyboard. |
-| ![Keys](docs/screenshots/en/keys-lavender.png) | **Keys.** Click a key, choose what it does on the base layer or while Fn is held: another key or a shortcut, a mouse button or the wheel, a media key, a macro (once, N times, until pressed again, while held), up to three keys at once, a program or a link, or nothing. *Program or link* sends one of the spare keys F13–F24, which the agent turns into the program. |
+| ![Keys](docs/screenshots/en/keys-lavender.png) | **Keys.** Click a key, choose what it does on the base layer or while Fn is held: another key or a shortcut, a mouse button or the wheel, a media key, a macro (once, N times, until pressed again, while held), up to three keys at once, a program or a link, another profile, or nothing. *Program or link* sends one of the spare keys F13–F24, which the agent turns into the program, the link or the profile. |
 | ![Macros](docs/screenshots/en/macros-lavender.png) | **Macros.** Record from the keyboard with or without your real pauses, type text, add key presses and mouse clicks, edit every pause. A bar shows how much of the keyboard's macro memory is used. Keys refer to macros by number: after deleting one, write the macros and both key layers again (the app moves the keys of the later macros with them). |
 | ![Profiles](docs/screenshots/en/profiles-lavender.png) | **Profiles.** A profile is everything the keyboard holds plus the PC effect. Switch from the header or here; export and import them as files. *Games and programs* switches a profile while a program runs (`cs2`, `eldenring.exe`, …). |
-| ![Device](docs/screenshots/en/device-graphite.png) | **Device.** Keyboard options, the clock, how the agent starts, access, the 2.4 GHz link record and *Reconnect the receiver*, theme, keyboard colours, language, notifications. |
+| ![Device](docs/screenshots/en/device-graphite.png) | **Device.** Keyboard options, the clock, battery measurements, how the agent starts, access, the 2.4 GHz link record and *Reconnect the receiver*, theme, keyboard colours, language, notifications. |
 
 Not in 0.0.2 yet: the tray icon of 0.0.1 (switching profiles from the panel). The agent's
 notifications (a lost 2.4 GHz link, a low battery) need `notify-send`.
@@ -157,16 +179,19 @@ notifications (a lost 2.4 GHz link, a low battery) need `notify-send`.
 ## Command line
 
 ```bash
-ak980 status                                 # connection, battery, profile, agent
+ak980 status                                 # connection, battery, profile, agent (--json, --waybar)
+ak980 battery --show on                      # what whole cycles taught about the battery
 ak980 time                                   # set the screen clock now
 ak980 lcd ~/Pictures/cat.gif --fit fill      # upload to the screen (kept in ~/.local/share/ak980/history)
 ak980 lcd cat.gif --preview out.gif          # only see how it will look
+ak980 lcd photo.jpg --text "Hello" --scroll --outline --tone sepia --preview out.gif   # running text
 ak980 light rotating --rainbow on            # a keyboard effect
 ak980 fx spectrum palette=fire sensitivity=70   # a PC effect (ak980 fx --list)
 ak980 custom --all 101820 --wasd ff8f1f      # per-key colours
 ak980 remap CapsLock key:ctrl                # remap; --fn for the Fn layer, --dry to see the bytes
 ak980 macro add "GG" "text:gg wp" && ak980 remap F12 macro:0
 ak980 launch F13 obs && ak980 remap F1 key:F13 --fn
+ak980 launch F14 profile:next && ak980 remap '!1' key:F14 --fn   # Fn+1 switches to the next profile
 ak980 profile new Gaming --copy && ak980 auto add cs2 Gaming && ak980 auto on
 ak980 service enable dinit-user              # how the agent starts
 ak980 link                                   # the 2.4 GHz link record
@@ -175,6 +200,22 @@ ak980 reconnect                              # re-plug the receiver (asks for yo
 
 `man ak980` and `ak980 <command> --help` have the details. Bash, zsh and fish completions are
 installed with the package.
+
+### In a panel
+
+`ak980 status --waybar` prints what a Waybar custom module reads: the battery on 2.4 GHz, `USB` on
+the cable, the rest in the tooltip, and the classes `usb`, `24g`, `absent` and `low`.
+
+```json
+"custom/ak980": {
+    "exec": "ak980 status --waybar",
+    "return-type": "json",
+    "interval": 60,
+    "format": "⌨ {}"
+}
+```
+
+`ak980 status --json` gives the same for scripts, with the battery estimate when there is one.
 
 ## Troubleshooting
 

@@ -28,6 +28,20 @@ over the cable too.
   macros, those of the deleted one go back to default); the window, the agent and the CLI no longer
   share one temporary file when they save the settings; turning on another way to start the agent
   switches the old one off only once the new one works; `ak980 agent --once` always syncs.
+- Beyond the vendor's app, with the vendor's own commands only:
+  - PC effects: a system monitor (processor load, memory in use or the processor's temperature as a
+    bar) and a typing heat map; over any PC effect, the lock keys while they are on and a flash for
+    desktop notifications (only that one came is seen, never its text).
+  - Profile keys: a Program or link key can switch to the next profile or to a named one
+    (`profile:next`, `profile:use:NAME`); the agent does it at once.
+  - Battery measurements: the agent learns from whole discharges and charges how long a full charge
+    lasts and how long charging takes, reads the level off the charging curve while the keyboard
+    charges on the cable in wired mode, and compares later cycles with the first. `ak980 battery`,
+    the Device page and, when turned on, the battery line show it.
+  - `ak980 status --json` and `--waybar`, for scripts and panels.
+  - Screen editor: turn, zoom and pan, sharp pixels for pixel art, tones (black and white, sepia,
+    negative), a hue shift, playing backward or there and back, running text over a picture, an
+    outline for captions; the same options in `ak980 lcd`.
 - Not in this version yet: the tray icon.
 - 2.4 GHz: the agent keeps the receiver's two vendor interfaces open, so that Linux polls them the
   way Windows and macOS do. Receivers of this kind can stop answering when a report waits unread

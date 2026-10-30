@@ -1,8 +1,9 @@
 # fish completion for ak980
-set -l cmds gui status list time agent daemon lcd effects modes light fx side custom options keys remap macro launch profile auto service setup apply link reconnect
+set -l cmds gui status battery list time agent daemon lcd effects modes light fx side custom options keys remap macro launch profile auto service setup apply link reconnect
 complete -c ak980 -f
 complete -c ak980 -n "not __fish_seen_subcommand_from $cmds" -a gui -d 'Open the app window'
 complete -c ak980 -n "not __fish_seen_subcommand_from $cmds" -a status -d 'Connection, battery, profile, agent'
+complete -c ak980 -n "not __fish_seen_subcommand_from $cmds" -a battery -d 'Battery measurements'
 complete -c ak980 -n "not __fish_seen_subcommand_from $cmds" -a time -d 'Sync the screen clock'
 complete -c ak980 -n "not __fish_seen_subcommand_from $cmds" -a agent -d 'Background agent'
 complete -c ak980 -n "not __fish_seen_subcommand_from $cmds" -a lcd -d 'Upload an animation to the screen'

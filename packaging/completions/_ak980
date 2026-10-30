@@ -5,6 +5,7 @@ _ak980() {
     commands=(
         'gui:open the app window'
         'status:connection, battery, profile, agent'
+        'battery:battery measurements: how long a charge lasts, charging time, condition'
         'list:the keyboard'"'"'s HID interfaces'
         'time:sync the screen clock with the system time'
         'agent:background agent: clock, PC effects, profiles, launcher keys'

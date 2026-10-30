@@ -4,7 +4,7 @@ _ak980() {
     local cur prev words cword
     _init_completion || return
 
-    local commands="gui status list time agent daemon lcd effects modes light fx side custom options keys remap
+    local commands="gui status battery list time agent daemon lcd effects modes light fx side custom options keys remap
                     macro launch profile auto service setup apply link reconnect"
     if [[ $cword -eq 1 ]]; then
         COMPREPLY=($(compgen -W "$commands --help --version --lang" -- "$cur"))

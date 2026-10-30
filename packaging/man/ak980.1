@@ -20,8 +20,16 @@ only accepts the clock and reports its battery level.
 .B gui \fR[\fB\-\-tray\fR]
 Open the app window, optionally hidden in the tray.
 .TP
-.B status
+.B status \fR[\fB\-\-json\fR | \fB\-\-waybar\fR]
 Connection, battery level, active profile and whether the background agent runs.
+\fB\-\-json\fR prints it for scripts, with the battery estimate; \fB\-\-waybar\fR as a Waybar
+custom module with \fBreturn\-type json\fR reads it.
+.TP
+.B battery \fR[\fB\-\-show on\fR|\fBoff\fR] [\fB\-\-reset\fR]
+What the agent has learned from whole cycles over 2.4 GHz: how long a full charge lasts, how long
+charging takes, the battery's condition against the first measured charge, and how long the charge
+lasts now. \fB\-\-show on\fR shows the estimates in the window and in \fBstatus\fR;
+\fB\-\-reset\fR forgets the measured cycles.
 .TP
 .B time \fR[\fB\-\-slot \fIN\fR]
 Set the screen clock to the system time.
@@ -34,9 +42,11 @@ profiles for programs; runs launcher keys. With \fB\-\-system\fR it only keeps t
 .TP
 .B lcd \fIFILE\fR [\fIoptions\fR]
 Upload a GIF, an image or a folder of numbered frames to the screen (up to 140 frames).
-Options: \fB\-\-fit\fR fit|fill|stretch, \fB\-\-speed\fR, \fB\-\-delay\fR, \fB\-\-step\fR,
-\fB\-\-trim\-start\fR, \fB\-\-trim\-end\fR, \fB\-\-text\fR, \fB\-\-preview\fR \fIOUT.gif\fR,
-\fB\-\-history\fR. Every upload is also kept in \fI~/.local/share/ak980/history\fR.
+Options: \fB\-\-fit\fR fit|fill|stretch, \fB\-\-rotate\fR 0|90|180|270, \fB\-\-zoom\fR,
+\fB\-\-pan\fR \fIX,Y\fR, \fB\-\-sharp\fR, \fB\-\-tone\fR natural|grey|sepia|negative, \fB\-\-hue\fR,
+\fB\-\-order\fR forward|backward|bounce, \fB\-\-speed\fR, \fB\-\-delay\fR, \fB\-\-step\fR,
+\fB\-\-trim\-start\fR, \fB\-\-trim\-end\fR, \fB\-\-text\fR, \fB\-\-scroll\fR [\fIPX\fR] (running text),
+\fB\-\-outline\fR, \fB\-\-preview\fR \fIOUT.gif\fR, \fB\-\-history\fR. Every upload is also kept in \fI~/.local/share/ak980/history\fR.
 .TP
 .B effects
 List the keyboard's lighting effects and the PC effects.
