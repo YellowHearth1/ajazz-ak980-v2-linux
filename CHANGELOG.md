@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.0.2 — 2026-10-30 (pre-release)
+## 0.0.2 — 2026-10-30
 
 > **Written entirely by artificial intelligence.** The author needed software like this for the
 > keyboard but does not have the skills to write it, and asked Claude, a large language model made by
@@ -8,8 +8,8 @@
 
 The whole program is rewritten in Rust: the `ak980` command and agent, and a new window on iced.
 The bytes it sends to the keyboard are checked against what the Python version, verified on the
-keyboard, sends for every kind of setting. Published as a pre-release until every feature is checked
-over the cable too.
+keyboard, sends for every kind of setting, and the program itself has been checked on an AK980 V2
+over the receiver and over the cable.
 
 - Size: the AppImage is 11 MB instead of 131 MB; the programs need only the C runtime and load the
   display libraries of the system.

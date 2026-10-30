@@ -14,10 +14,9 @@ only exists for Windows; this app covers what it does and adds what it could not
 keeps itself in sync with your system, lighting effects can be computed on the PC (music spectrum,
 reactive typing, fire), and profiles switch when a game starts.
 
-Version 0.0.2 is a rewrite in Rust (the window uses [iced](https://iced.rs)) and a **pre-release**:
-it has been checked on a real AK980 V2 over the 2.4 GHz receiver, and the checks over the cable are
-still being done. 0.0.1, the Python version, is outdated: the project has gone another way, and it
-is no longer developed.
+Version 0.0.2 is a rewrite in Rust (the window uses [iced](https://iced.rs)), checked on a real
+AK980 V2 over the 2.4 GHz receiver and over the cable. 0.0.1, the Python version, is outdated: the
+project has gone another way, and it is no longer developed.
 
 ![Lighting effects computed on the PC, previewed on the keyboard itself](docs/screenshots/en/lighting-lavender.png)
 

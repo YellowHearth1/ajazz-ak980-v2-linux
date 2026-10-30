@@ -9,7 +9,7 @@ pkgbase = ajazz-ak980-v2-linux
 	license = Ubuntu-font-1.0
 	makedepends = cargo
 	source = ajazz-ak980-v2-linux-0.0.2.tar.gz::https://github.com/yellowhearth1/ajazz-ak980-v2-linux/archive/refs/tags/v0.0.2.tar.gz
-	sha256sums = SKIP
+	sha256sums = 7d584e98165d4164d78a188c66bc62fd634a2b78e41f99c6a28a9adb71625a38
 
 pkgname = ajazz-ak980-v2-linux
 	install = ajazz-ak980-v2-linux.install
