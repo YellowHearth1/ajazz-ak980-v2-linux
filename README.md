@@ -98,9 +98,9 @@ make DESTDIR="$DESTDIR" PREFIX=/usr install       # + install-openrc / -dinit / 
 |---|---|---|
 | any desktop | starts with the session (XDG autostart) | |
 | systemd | `systemctl --user enable --now ak980-agent` | `systemctl enable --now ak980d` |
-| dinit | `dinitctl --user enable ak980-agent` | `dinitctl enable ak980d` |
+| dinit | `dinitctl --user enable ak980-agent` (your own dinit, from turnstile or userspawn) | `dinitctl enable ak980d` |
 | OpenRC | session autostart | `rc-update add ak980d default && rc-service ak980d start` |
-| runit | session autostart | `ln -s /etc/runit/sv/ak980d /run/runit/service/` |
+| runit | `ak980 service enable runit-user` (your own runsvdir, from turnstile or userspawn), otherwise session autostart | Artix: `ln -s /etc/runit/sv/ak980d /etc/runit/runsvdir/default/`, Void: `ln -s /etc/sv/ak980d /var/service/` |
 | s6 | session autostart | `s6-service add default ak980d-srv && s6-db-reload` |
 
 `ak980 service list` shows what your system offers and what is enabled.

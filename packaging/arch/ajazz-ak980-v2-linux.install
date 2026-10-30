@@ -11,7 +11,7 @@ post_install() {
       systemd:  systemctl enable --now ak980d.service
       OpenRC:   rc-update add ak980d default && rc-service ak980d start
       dinit:    dinitctl enable ak980d
-      runit:    ln -s /etc/runit/sv/ak980d /run/runit/service/
+      runit:    ln -s /etc/runit/sv/ak980d /etc/runit/runsvdir/default/
       s6:       s6-service add default ak980d-srv && s6-db-reload
     Or pick one on the app's Device page.
 MSG

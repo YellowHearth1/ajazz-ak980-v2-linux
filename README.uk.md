@@ -98,9 +98,9 @@ make DESTDIR="$DESTDIR" PREFIX=/usr install       # + install-openrc / -dinit / 
 |---|---|---|
 | будь-який робочий стіл | разом із сеансом (XDG-автозапуск) | |
 | systemd | `systemctl --user enable --now ak980-agent` | `systemctl enable --now ak980d` |
-| dinit | `dinitctl --user enable ak980-agent` | `dinitctl enable ak980d` |
+| dinit | `dinitctl --user enable ak980-agent` (ваш власний dinit, від turnstile чи userspawn) | `dinitctl enable ak980d` |
 | OpenRC | автозапуск із сеансом | `rc-update add ak980d default && rc-service ak980d start` |
-| runit | автозапуск із сеансом | `ln -s /etc/runit/sv/ak980d /run/runit/service/` |
+| runit | `ak980 service enable runit-user` (ваш власний runsvdir, від turnstile чи userspawn), інакше автозапуск із сеансом | Artix: `ln -s /etc/runit/sv/ak980d /etc/runit/runsvdir/default/`, Void: `ln -s /etc/sv/ak980d /var/service/` |
 | s6 | автозапуск із сеансом | `s6-service add default ak980d-srv && s6-db-reload` |
 
 `ak980 service list` показує, що доступно у вашій системі і що вже ввімкнено.
