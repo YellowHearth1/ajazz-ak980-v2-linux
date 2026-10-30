@@ -49,6 +49,12 @@
   </categories>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.0.4" date="2026-10-30">
+      <description>
+        <p>One package for every init system, built with git clone, cd and makepkg -si: the app
+        writes the service for the init system it runs on when the service is switched on.</p>
+      </description>
+    </release>
     <release version="0.0.3" date="2026-10-30">
       <description>
         <p>The clock is set once a week by default, so the animation stays on the screen; reminders; a

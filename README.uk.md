@@ -82,38 +82,34 @@ Windows. Ця програма вміє все, що вміє він, і роб�
 
 ## Встановлення
 
-### Arch Linux, Artix і похідні: готовий пакет
+### Arch Linux, Artix і похідні
 
-У кожному [релізі](https://github.com/yellowhearth1/ajazz-ak980-v2-linux/releases) є пакети, зібрані
-для pacman: `ajazz-ak980-v2-linux-<версія>-x86_64.pkg.tar.zst` і по одному для системної служби
-кожної init-системи (`-dinit`, `-openrc`, `-runit`, `-s6`; юніти systemd — в основному пакеті).
-Завантажте основний пакет (і пакет своєї init-системи, якщо потрібна системна служба), тоді:
+```bash
+git clone https://github.com/yellowhearth1/ajazz-ak980-v2-linux
+cd ajazz-ak980-v2-linux
+makepkg -si
+```
+
+`makepkg -si` збирає цю копію репозиторію через cargo, проганяє тести й встановлює пакет; усе
+потрібне програмі pacman доставить зі сховищ вашого дистрибутива. Додайте `-c` (`makepkg -sic`), щоб
+після збірки видалити її файли, а їх понад гігабайт.
+
+Або візьміть уже зібраний пакет: у кожному
+[релізі](https://github.com/yellowhearth1/ajazz-ak980-v2-linux/releases) є
+`ajazz-ak980-v2-linux-<версія>-x86_64.pkg.tar.zst`. Завантажте його, а тоді
 
 ```bash
 sudo pacman -U ajazz-ak980-v2-linux-*-x86_64.pkg.tar.zst
 ```
 
-Усе потрібне програмі pacman доставить зі сховищ вашого дистрибутива. Графічний встановлювач, що
-відкриває файли `.pkg.tar.zst` (наприклад, pamac), встановить пакет і подвійним клацанням.
+Графічний встановлювач, що відкриває файли `.pkg.tar.zst` (наприклад, pamac), встановить пакет і
+подвійним клацанням.
 
-### Arch Linux, Artix і похідні: зібрати самому
-
-```bash
-git clone https://github.com/yellowhearth1/ajazz-ak980-v2-linux
-cd ajazz-ak980-v2-linux/packaging/arch
-makepkg -s
-sudo pacman -U ajazz-ak980-v2-linux-[0-9]*.pkg.tar.zst
-```
-
-`makepkg -s` завантажує реліз, указаний у PKGBUILD, і збирає його через cargo; `pacman -U`
-встановлює основний пакет `ajazz-ak980-v2-linux`. Не `makepkg -si`: так встановилися б усі пакети,
-які робить PKGBUILD, зокрема службові для всіх чотирьох init-систем, а кожен із них потребує своєї
-init-системи. Щоб зібрати саме цю копію репозиторію, спершу виконайте `make dist` і скопіюйте
-`dist/*.tar.gz` у `packaging/arch`, а тоді `makepkg -s --skipchecksums`.
-
-PKGBUILD зроблено як спліт-пакет у стилі Artix: якщо потрібна системна служба, поставте поруч пакет
-для своєї init-системи: `sudo pacman -U ajazz-ak980-v2-linux-dinit-*.pkg.tar.zst` або те саме з
-`-openrc`, `-runit` чи `-s6` (юніти systemd лежать в основному пакеті).
+Один пакет для всіх init-систем. Фонова служба запускається разом із сеансом робочого столу, а
+службу systemd, dinit, OpenRC, runit чи s6 вмикає сама програма й пише її під ту init-систему, яка у
+вас є (див. [Перший запуск](#перший-запуск)). До 0.0.3 ці служби були окремими пакетами (`-dinit`,
+`-openrc`, `-runit`, `-s6`); новий пакет їх замінює, тож pacman запитає, чи їх видалити: відповідайте
+«так», а потім знову увімкніть службу на сторінці *Пристрій*.
 
 ### AppImage (будь-який дистрибутив)
 
@@ -138,8 +134,11 @@ PKGBUILD зроблено як спліт-пакет у стилі Artix: якщ
 
 ```bash
 make                                              # cargo build --release --locked
-make DESTDIR="$DESTDIR" PREFIX=/usr install       # + install-openrc / -dinit / -runit / -s6
+make DESTDIR="$DESTDIR" PREFIX=/usr install       # програми, дані, правило udev, юніти systemd
 ```
+
+Служби інших init-систем програма пише сама, коли їх вмикають; `install-openrc`, `install-dinit`,
+`install-runit` і `install-s6` натомість кладуть їх у пакет.
 
 ## Перший запуск
 
@@ -150,19 +149,24 @@ make DESTDIR="$DESTDIR" PREFIX=/usr install       # + install-openrc / -dinit / 
    якими йде набраний текст, лишаються за root, тож інші програми не прочитають через них ваші
    натискання.
 2. **Фонова служба.** Вона тримає годинник точним, запускає ефекти ПК, перемикає профілі та
-   обробляє клавіші запуску. Пакети запускають її разом із сеансом робочого столу. Щоб запускати її
-   як службу, оберіть варіант на сторінці *Пристрій* або:
+   обробляє клавіші запуску. Пакет запускає її разом із сеансом робочого столу. Щоб натомість вона
+   працювала як служба вашої init-системи, увімкніть її на сторінці *Пристрій* або з консолі:
 
-| Init-система | Повна служба (для користувача) | Лише годинник, для всієї системи |
+```bash
+ak980 service list                  # що є у вашій системі і що вже ввімкнено
+ak980 service enable dinit-user     # наприклад
+```
+
+| Спосіб | Що працює | Init-система |
 |---|---|---|
-| будь-який робочий стіл | разом із сеансом (XDG-автозапуск) | |
-| systemd | `systemctl --user enable --now ak980-agent` | `systemctl enable --now ak980d` |
-| dinit | `dinitctl --user enable ak980-agent` (ваш власний dinit, від turnstile чи userspawn) | `dinitctl enable ak980d` |
-| OpenRC | автозапуск із сеансом | `rc-update add ak980d default && rc-service ak980d start` |
-| runit | `ak980 service enable runit-user` (ваш власний runsvdir, від turnstile чи userspawn), інакше автозапуск із сеансом | Artix: `ln -s /etc/runit/sv/ak980d /etc/runit/runsvdir/default/`, Void: `ln -s /etc/sv/ak980d /var/service/` |
-| s6 | автозапуск із сеансом | `s6-service add default ak980d-srv && s6-db-reload` |
+| `session` | повна служба, разом із сеансом робочого столу (XDG-автозапуск) | будь-яка |
+| `systemd-user` | повна служба, як ваша служба користувача systemd | systemd |
+| `dinit-user` | повна служба, як служба вашого власного dinit (від turnstile чи userspawn) | dinit |
+| `runit-user` | повна служба, під вашим власним runsvdir (від turnstile чи userspawn) | runit |
+| `system-systemd`, `system-dinit`, `system-openrc`, `system-runit`, `system-s6` | лише годинник, для всієї системи, ще й до входу; один раз попросить пароль root | саме ця |
 
-`ak980 service list` показує, що доступно у вашій системі і що вже ввімкнено.
+Програма пише службу під вашу init-систему, з шляхом до програми, і дає самій init-системі перевірити
+її, перш ніж та ввімкнеться. Сам пакет встановлює лише юніти systemd.
 
 **Служба цієї програми не може завадити системі запуститися.** dinit не запускає `boot`, якщо в
 служби, на яку він чекає, опис, який він не може прочитати; у користувацькому `boot` разом із нею

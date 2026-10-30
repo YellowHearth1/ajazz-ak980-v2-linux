@@ -1,24 +1,65 @@
 # The udev rule takes effect through pacman's own udev hook, which reloads the rules after the
-# transaction; nothing here has to trigger devices.
+# transaction; nothing here has to trigger devices. Nothing here may fail a transaction either.
 
 post_install() {
   cat <<'MSG'
-==> Ajazz AK980 V2: if the app still cannot reach the keyboard, reconnect it.
-==> The background agent starts with your desktop session. To start it as a service instead:
-      systemd:  systemctl --user enable --now ak980-agent.service
-      dinit:    dinitctl --user enable ak980-agent     (package ajazz-ak980-v2-linux-dinit)
-    Clock only, system-wide (before login too):
-      systemd:  systemctl enable --now ak980d.service
-      OpenRC:   rc-update add ak980d default && rc-service ak980d start
-      dinit:    dinitctl enable ak980d
-      runit:    ln -s /etc/runit/sv/ak980d /etc/runit/runsvdir/default/
-      s6:       s6-service add default ak980d-srv && s6-db-reload
-    Or pick one on the app's Device page.
+==> Ajazz AK980 V2: if the app cannot reach the keyboard yet, reconnect it.
+==> The background agent starts with your desktop session. To run it as a service of your init
+    system (systemd, dinit, OpenRC, runit or s6), switch it on on the app's Device page or with
+    `ak980 service enable`: the app writes the service for the init system you have.
 MSG
 }
 
-# The system-wide clock service is switched off before its unit goes; on other init systems there
-# is no systemctl and nothing to do. Nothing here may fail the transaction.
+post_upgrade() {
+  if [ "$(vercmp "$2" 0.0.4)" -lt 0 ]; then
+    cat <<'MSG'
+==> Ajazz AK980 V2: the -dinit, -openrc, -runit and -s6 packages are gone; the app writes the
+    service for your init system itself. If one of them started the agent or the clock, switch it
+    on again on the Device page (`ak980 service list` shows what is on).
+MSG
+  fi
+}
+
+# A system service the app wrote belongs to no package, so it is switched off and taken away here,
+# before the program goes; otherwise an init system would keep starting a program that is not
+# there. Only files that start this package's program are touched.
 pre_remove() {
+  ours() { grep -qs '/usr/bin/ak980' "$1"; }
+
   systemctl disable --now ak980d.service >/dev/null 2>&1 || true
+
+  if ours /etc/init.d/ak980d; then
+    rc-service ak980d stop >/dev/null 2>&1 || true
+    rc-update del ak980d default >/dev/null 2>&1 || true
+    rm -f /etc/runlevels/*/ak980d /etc/init.d/ak980d
+  fi
+
+  if ours /etc/dinit.d/ak980d; then
+    dinitctl disable ak980d >/dev/null 2>&1 || true
+    dinitctl stop ak980d >/dev/null 2>&1 || true
+    rm -f /etc/dinit.d/boot.d/ak980d /etc/dinit.d/ak980d
+  fi
+
+  for sv in /etc/runit/sv/ak980d /etc/sv/ak980d; do
+    if ours "$sv/run"; then
+      for link in /run/runit/service/ak980d /etc/runit/runsvdir/*/ak980d /var/service/ak980d; do
+        if [ -L "$link" ]; then
+          rm -f "$link"
+        fi
+      done
+      rm -rf "$sv"
+    fi
+  done
+
+  # s6-rc compiles every service at once: while the bundle names ours, its definition has to stay,
+  # or no later change would compile
+  if ours /etc/s6/sv/ak980d-srv/run; then
+    if [ -e /etc/s6/adminsv/default/contents.d/ak980d-srv ]; then
+      s6-service delete default ak980d-srv >/dev/null 2>&1 && s6-db-reload >/dev/null 2>&1
+    fi
+    if [ ! -e /etc/s6/adminsv/default/contents.d/ak980d-srv ]; then
+      rm -rf /etc/s6/sv/ak980d-srv
+    fi
+  fi
+  true
 }

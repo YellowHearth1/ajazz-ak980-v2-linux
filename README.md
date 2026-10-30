@@ -81,38 +81,34 @@ keyboard. What the vendor's Windows app does not do:
 
 ## Install
 
-### Arch Linux, Artix and derivatives: the ready-made package
+### Arch Linux, Artix and derivatives
 
-Each [release](https://github.com/yellowhearth1/ajazz-ak980-v2-linux/releases) has packages built
-for pacman: `ajazz-ak980-v2-linux-<version>-x86_64.pkg.tar.zst`, and one for each init system's
-system service (`-dinit`, `-openrc`, `-runit`, `-s6`; the systemd units are in the main package).
-Download the main package, and the one for your init system if you want the system service, then:
+```bash
+git clone https://github.com/yellowhearth1/ajazz-ak980-v2-linux
+cd ajazz-ak980-v2-linux
+makepkg -si
+```
+
+`makepkg -si` builds the checkout with cargo, runs the tests and installs the package; pacman brings
+in what the app needs from your distribution's repositories. Add `-c` (`makepkg -sic`) to delete
+the build files afterwards, over a gigabyte of them.
+
+Or take the package already built: each
+[release](https://github.com/yellowhearth1/ajazz-ak980-v2-linux/releases) has
+`ajazz-ak980-v2-linux-<version>-x86_64.pkg.tar.zst`. Download it, then
 
 ```bash
 sudo pacman -U ajazz-ak980-v2-linux-*-x86_64.pkg.tar.zst
 ```
 
-pacman brings in what the app needs from your distribution's repositories. A graphical package
-installer that opens `.pkg.tar.zst` files (pamac, for one) installs it on a double click too.
+A graphical package installer that opens `.pkg.tar.zst` files (pamac, for one) installs it on a
+double click too.
 
-### Arch Linux, Artix and derivatives: build it yourself
-
-```bash
-git clone https://github.com/yellowhearth1/ajazz-ak980-v2-linux
-cd ajazz-ak980-v2-linux/packaging/arch
-makepkg -s
-sudo pacman -U ajazz-ak980-v2-linux-[0-9]*.pkg.tar.zst
-```
-
-`makepkg -s` downloads the release the PKGBUILD names and builds it with cargo; `pacman -U` installs
-the main package, `ajazz-ak980-v2-linux`. Not `makepkg -si`: that installs every package the
-PKGBUILD makes, the service packages for all four init systems among them, and each of those needs
-its own init system. To build the checkout itself instead, run `make dist` and copy `dist/*.tar.gz`
-into `packaging/arch` first, then `makepkg -s --skipchecksums`.
-
-The PKGBUILD is a split package in the Artix style; install the service package for your init
-system next to it if you want a system service: `sudo pacman -U ajazz-ak980-v2-linux-dinit-*.pkg.tar.zst`,
-or the same with `-openrc`, `-runit` or `-s6` (the systemd units are in the main package).
+One package serves every init system. The agent starts with your desktop session; a service of
+systemd, dinit, OpenRC, runit or s6 is switched on in the app, which writes it for the init system
+you have (see [First start](#first-start)). Up to 0.0.3 those services came in packages of their
+own (`-dinit`, `-openrc`, `-runit`, `-s6`); the new package replaces them, so pacman asks to remove
+them: answer yes, then switch the service on again on the *Device* page.
 
 ### AppImage (any distribution)
 
@@ -138,8 +134,11 @@ at run time and falls back to drawing on the CPU.
 
 ```bash
 make                                              # cargo build --release --locked
-make DESTDIR="$DESTDIR" PREFIX=/usr install       # + install-openrc / -dinit / -runit / -s6
+make DESTDIR="$DESTDIR" PREFIX=/usr install       # programs, data, udev rule, systemd units
 ```
+
+The app writes the service of any other init system when it is switched on; `install-openrc`,
+`install-dinit`, `install-runit` and `install-s6` put those in the package instead.
 
 ## First start
 
@@ -149,19 +148,25 @@ make DESTDIR="$DESTDIR" PREFIX=/usr install       # + install-openrc / -dinit / 
    and commands on the cable, the two vendor interfaces on the receiver. The interfaces that carry
    what you type stay root's, so other programs cannot read your key presses through them.
 2. **Background agent.** It keeps the clock right, runs PC effects, switches profiles and handles
-   launcher keys. Packages start it with your desktop session. To run it as a service instead, pick
-   it on the *Device* page or:
+   launcher keys. The package starts it with your desktop session. To run it as a service of your
+   init system instead, switch it on on the *Device* page, or from a console:
 
-| Init system | Full agent (per user) | Clock only, system-wide |
+```bash
+ak980 service list                  # what your system offers, and what is on
+ak980 service enable dinit-user     # for one
+```
+
+| Method | What runs | Init system |
 |---|---|---|
-| any desktop | starts with the session (XDG autostart) | |
-| systemd | `systemctl --user enable --now ak980-agent` | `systemctl enable --now ak980d` |
-| dinit | `dinitctl --user enable ak980-agent` (your own dinit, from turnstile or userspawn) | `dinitctl enable ak980d` |
-| OpenRC | session autostart | `rc-update add ak980d default && rc-service ak980d start` |
-| runit | `ak980 service enable runit-user` (your own runsvdir, from turnstile or userspawn), otherwise session autostart | Artix: `ln -s /etc/runit/sv/ak980d /etc/runit/runsvdir/default/`, Void: `ln -s /etc/sv/ak980d /var/service/` |
-| s6 | session autostart | `s6-service add default ak980d-srv && s6-db-reload` |
+| `session` | the full agent, with your desktop session (XDG autostart) | any |
+| `systemd-user` | the full agent, as your systemd user service | systemd |
+| `dinit-user` | the full agent, as a service of your own dinit (from turnstile or userspawn) | dinit |
+| `runit-user` | the full agent, under your own runsvdir (from turnstile or userspawn) | runit |
+| `system-systemd`, `system-dinit`, `system-openrc`, `system-runit`, `system-s6` | the clock only, system-wide, before anyone logs in too; asks for the root password once | that one |
 
-`ak980 service list` shows what your system offers and what is enabled.
+The app writes the service for the init system you have, with the path to the program, and lets
+that init system check it before it is switched on. The package itself installs only the systemd
+units.
 
 **A service of this app cannot stop your system from starting.** dinit refuses to start `boot` when
 a service it waits for has a description it cannot read, and in a user's `boot` that takes D-Bus and

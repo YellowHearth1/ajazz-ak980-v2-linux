@@ -43,13 +43,11 @@ jobs:
     container: archlinux:latest
     steps:
       - uses: actions/checkout@v7
-      - name: Build the package from this commit
+      - name: Build the package from this commit, as git clone + makepkg -si would
         run: |
           pacman -Syu --noconfirm --needed base-devel cargo git
           useradd -m builder
-          make dist
-          cp dist/*.tar.gz packaging/arch/
           chown -R builder .
-          # This commit's tarball, not the release archive the checksum is for
-          su builder -c "cd packaging/arch && makepkg --noconfirm -f --skipchecksums"
-          ls -l packaging/arch/*.pkg.tar.zst
+          su builder -c "makepkg --noconfirm -f"
+          ls -l *.pkg.tar.zst
+          test "$(ls *.pkg.tar.zst | wc -l)" -eq 1

@@ -1,5 +1,5 @@
 ---
-version: 0.0.3
+version: 0.0.4
 name: Ajazz AK980 V2 | Software for Linux
 description: A configurator for one specific keyboard, built around a faithful drawing of that keyboard, for people who game and type on it every day.
 source: crates/ak980-gui/src/theme.rs (every value below lives there)

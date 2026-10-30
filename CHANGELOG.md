@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.0.4 — 2026-10-30
+
+> **Written entirely by artificial intelligence.** The author needed software like this for the
+> keyboard but does not have the skills to write it, and asked Claude, a large language model made by
+> Anthropic, to make it. Use it at your own risk and expect mistakes.
+
+- One package for every init system, built from the top of the repository: `git clone`,
+  `cd ajazz-ak980-v2-linux`, `makepkg -si`. The `-dinit`, `-openrc`, `-runit` and `-s6` packages
+  are gone: the app writes the service for the init system that runs when it is switched on (the
+  *Device* page or `ak980 service enable`), as it already did for the AppImage. The new package
+  replaces them, so switch the service on again after the update. Removing the package switches off
+  and takes away the system services the app wrote.
+- dinit: a user service whose description had gone with its package still showed as on, and
+  switching it on was refused ("already enabled"). It now shows as off, and switching it on writes
+  the description and links it again.
+- The notes of every release say how to install it.
+
 ## 0.0.3 — 2026-10-30
 
 > **Written entirely by artificial intelligence.** The author needed software like this for the

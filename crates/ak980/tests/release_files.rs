@@ -33,10 +33,18 @@ fn design_notes_describe_this_version() {
     assert!(design.lines().any(|l| l == format!("version: {VERSION}")), "docs/DESIGN.md describes another version");
 }
 
+/// `git clone`, `cd`, `makepkg -si`: one package from the checkout, whatever the init system.
 #[test]
-fn package_recipe_builds_this_version() {
-    let pkgbuild = repo_file("packaging/arch/PKGBUILD");
+fn package_recipe_builds_this_version_as_one_package() {
+    let pkgbuild = repo_file("PKGBUILD");
     assert!(pkgbuild.lines().any(|l| l == format!("pkgver={VERSION}")), "PKGBUILD builds another version");
-    let srcinfo = repo_file("packaging/arch/.SRCINFO");
-    assert!(srcinfo.contains(&format!("pkgver = {VERSION}")), ".SRCINFO is out of date: run makepkg --printsrcinfo");
+    assert!(pkgbuild.lines().any(|l| l == "pkgname=ajazz-ak980-v2-linux"), "PKGBUILD makes more than one package");
+    let install = pkgbuild.lines().find_map(|l| l.strip_prefix("install=")).expect("an install script");
+    assert!(Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").join(install).is_file(), "no {install}");
+}
+
+#[test]
+fn release_notes_say_how_to_install() {
+    let install = repo_file("packaging/release-install.md");
+    assert!(install.contains("makepkg -si") && install.contains("pacman -U") && install.contains("@VERSION@"));
 }

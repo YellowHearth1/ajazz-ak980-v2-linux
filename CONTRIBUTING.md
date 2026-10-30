@@ -66,7 +66,9 @@ and radii come from `crates/ak980-gui/src/theme.rs`. If a token is missing, add 
 
 ## Releases
 
-1. Update the version in `Cargo.toml`, `packaging/arch/PKGBUILD` and the metainfo file, and add a
-   `CHANGELOG.md` entry; a heading with "(pre-release)" publishes a pre-release.
-2. Tag `vX.Y.Z` and push the tag: GitHub Actions builds the AppImage and the source archive.
-3. Run `updpkgsums` in `packaging/arch` and regenerate `.SRCINFO` with `makepkg --printsrcinfo`.
+1. Update the version in `Cargo.toml` (and `Cargo.lock`), `PKGBUILD`, the man page, the metainfo
+   file and `docs/DESIGN.md`, and add a `CHANGELOG.md` entry; `crates/ak980/tests/release_files.rs`
+   checks that they agree. A heading with "(pre-release)" publishes a pre-release.
+2. Tag `vX.Y.Z` and push the tag: GitHub Actions builds the AppImage, the source archive and the
+   pacman package (with `makepkg` in the checkout, as `git clone` + `makepkg -si` does), and the
+   release notes get the CHANGELOG entry and `packaging/release-install.md`.
