@@ -213,5 +213,6 @@ same then.
 | dongle battery | yes, 2026-10-29: `20 01 00 64` (100 %); about 120 ms for the first request after idle, 13 ms after | ak980-studio |
 | dongle clock | yes, 2026-10-29: a test time sent over the dongle showed on the screen; the agent syncs on its own when the keyboard switches to 2.4 GHz | taken from the vendor driver |
 | logo light | not addressable | |
+| white | 2026-10-30: (255, 255, 255) looks pink, the red LEDs are stronger; red 78 %, green 100 %, blue 95 % looked white on this unit | |
 
 If you can test a line marked "not yet", please open an issue with what you saw.
