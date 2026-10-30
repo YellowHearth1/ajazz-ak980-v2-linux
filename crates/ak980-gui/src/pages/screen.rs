@@ -9,7 +9,7 @@ use std::time::{Duration, Instant};
 
 use ak980_core::device::{WiredKeyboard, LCD_HEIGHT, LCD_MAX_FRAMES, LCD_WIDTH};
 use ak980_core::i18n::{plural, tr};
-use ak980_core::lcd::{self, Fit, RenderOptions, Source, IMAGE_EXTS, SECONDS_PER_PAGE, TEXT_POSITIONS};
+use ak980_core::lcd::{self, Fit, Order, RenderOptions, Source, Tone, IMAGE_EXTS, SECONDS_PER_PAGE, TEXT_POSITIONS};
 use ak980_core::tr;
 use iced::futures::channel::mpsc;
 use iced::widget::{button, column, container, image, mouse_area, opaque, progress_bar, row, scrollable, text, text_input,
@@ -55,6 +55,17 @@ pub enum Msg {
     DeleteFrame,
     RestoreFrames,
     Fit(Fit),
+    Rotate(u8),
+    Zoom(i32),
+    PanX(i32),
+    PanY(i32),
+    Sharp(bool),
+    Tone(Tone),
+    Hue(i32),
+    Order(Order),
+    Scroll(bool),
+    ScrollSpeed(i32),
+    Outline(bool),
     FlipH(bool),
     FlipV(bool),
     Brightness(i32),
@@ -103,10 +114,9 @@ fn load(app: &mut App, path: PathBuf) -> Task<Message> {
 /// options select in all.
 fn preview(src: &Source, o: &RenderOptions) -> (Vec<Frame>, Vec<usize>, usize) {
     let picked = src.select(o, LCD_MAX_FRAMES);
-    let shown = picked
-        .iter()
-        .map(|(i, d)| {
-            let rgb = lcd::preview_565(&src.render_frame(*i, o), o.dither);
+    let shown = (0..picked.len())
+        .map(|k| {
+            let (rgb, d) = (lcd::preview_565(&src.render_frame(&picked, k, o), o.dither), &picked[k].1);
             let rgba: Vec<u8> = rgb.pixels().flat_map(|p| [p.0[0], p.0[1], p.0[2], 255]).collect();
             (rgba, *d)
         })
@@ -215,6 +225,17 @@ pub fn update(app: &mut App, msg: Msg) -> Task<Message> {
         }
         Msg::RestoreFrames => o.deleted.clear(),
         Msg::Fit(f) => o.fit = f,
+        Msg::Rotate(r) => o.rotate = r % 4,
+        Msg::Zoom(v) => o.zoom = v as f32 / 100.0,
+        Msg::PanX(v) => o.pan.0 = v as f32 / 100.0,
+        Msg::PanY(v) => o.pan.1 = v as f32 / 100.0,
+        Msg::Sharp(v) => o.sharp = v,
+        Msg::Tone(t) => o.tone = t,
+        Msg::Hue(v) => o.hue = v,
+        Msg::Order(v) => o.order = v,
+        Msg::Scroll(on) => o.text_scroll = on.then_some(6),
+        Msg::ScrollSpeed(v) => o.text_scroll = Some(v.clamp(1, 20) as u32),
+        Msg::Outline(v) => o.text_outline = v,
         Msg::FlipH(v) => o.flip_h = v,
         Msg::FlipV(v) => o.flip_v = v,
         Msg::Brightness(v) => o.brightness = v as f32 / 100.0,
@@ -392,8 +413,26 @@ pub fn view(app: &App) -> Element<'_, Message> {
     let fits = vec![(Fit::Fit, tr("Fit")), (Fit::Fill, tr("Fill")), (Fit::Stretch, tr("Stretch"))];
     let positions: Vec<Choice<&'static str>> = TEXT_POSITIONS.iter().map(|p| Choice::new(*p, tr(position_label(p)))).collect();
     let current_pos = positions.iter().find(|c| c.value == o.text_pos).cloned();
-    let picture = vec![
+    let turns = vec![(0u8, "0°".to_string()), (1, "90°".into()), (2, "180°".into()), (3, "270°".into())];
+    let tones = vec![(Tone::Natural, tr("Natural")), (Tone::Grey, tr("Black and white")), (Tone::Sepia, tr("Sepia")),
+                     (Tone::Negative, tr("Negative"))];
+    let mut picture = vec![
         setting(tr("Scale"), None, segmented(fits, o.fit, |f| wrap(Msg::Fit(f)))),
+        setting(tr("Turn"), None, segmented(turns, o.rotate, |r| wrap(Msg::Rotate(r)))),
+        setting(tr("Zoom"), Some(tr("Shows a part of the picture; move it below")),
+                widgets::ranged(percent(o.zoom), 100, 400, "%", |v| wrap(Msg::Zoom(v)))),
+    ];
+    if o.zoom > 1.0 {
+        picture.push(setting(tr("Left – right"), None, widgets::ranged((o.pan.0 * 100.0).round() as i32, -100, 100, "",
+                                                                     |v| wrap(Msg::PanX(v)))));
+        picture.push(setting(tr("Up – down"), None, widgets::ranged((o.pan.1 * 100.0).round() as i32, -100, 100, "",
+                                                                  |v| wrap(Msg::PanY(v)))));
+    }
+    picture.extend([
+        setting(tr("Sharp pixels"), Some(tr("No smoothing when scaling, for pixel art")),
+                toggler(o.sharp).on_toggle(|v| wrap(Msg::Sharp(v))).style(theme::switch)),
+        setting(tr("Tone"), None, segmented(tones, o.tone, |t| wrap(Msg::Tone(t)))),
+        setting(tr("Shift the hues"), None, widgets::ranged(o.hue, -180, 180, "°", |v| wrap(Msg::Hue(v)))),
         setting(tr("Mirror"), None, toggler(o.flip_h).on_toggle(|v| wrap(Msg::FlipH(v))).style(theme::switch)),
         setting(tr("Upside down"), None, toggler(o.flip_v).on_toggle(|v| wrap(Msg::FlipV(v))).style(theme::switch)),
         setting(tr("Brightness"), None, widgets::ranged(percent(o.brightness), 20, 200, "%", |v| wrap(Msg::Brightness(v)))),
@@ -401,8 +440,10 @@ pub fn view(app: &App) -> Element<'_, Message> {
         setting(tr("Saturation"), None, widgets::ranged(percent(o.saturation), 0, 200, "%", |v| wrap(Msg::Saturation(v)))),
         setting(tr("Smooth gradients"), Some(tr("Dithering hides the steps of the panel's 16-bit colour")),
                 toggler(o.dither).on_toggle(|v| wrap(Msg::Dither(v))).style(theme::switch)),
-    ];
+    ]);
+    let orders = vec![(Order::Forward, tr("Forward")), (Order::Backward, tr("Backward")), (Order::Bounce, tr("There and back"))];
     let timing = vec![
+        setting(tr("Plays"), None, segmented(orders, o.order, |v| wrap(Msg::Order(v)))),
         setting(tr("Speed"), None, widgets::ranged(percent(o.speed), 25, 400, "%", |v| wrap(Msg::Speed(v)))),
         setting(tr("Same delay for every frame"), Some(tr("0 keeps the delays of the file")),
                 widgets::ranged(o.fixed_delay.unwrap_or(0) as i32, 0, lcd::MAX_DELAY as i32, &tr(" ms"),
@@ -412,15 +453,25 @@ pub fn view(app: &App) -> Element<'_, Message> {
         setting(tr("Cut frames from the start"), None, widgets::ranged(o.trim_start as i32, 0, 200, "", |v| wrap(Msg::TrimStart(v)))),
         setting(tr("Cut frames from the end"), None, widgets::ranged(o.trim_end as i32, 0, 200, "", |v| wrap(Msg::TrimEnd(v)))),
     ];
-    let caption_rows = vec![
+    let mut caption_rows = vec![
         setting(tr("Caption"), None, text_input(&tr("Optional caption"), &o.text).on_input(|t| wrap(Msg::Text(t)))
             .padding(6).style(theme::input).width(260)),
+        setting(tr("Running text"), Some(tr("The caption crosses the screen from right to left; a still picture gets the frames it needs")),
+                toggler(o.text_scroll.is_some()).on_toggle(|v| wrap(Msg::Scroll(v))).style(theme::switch)),
+    ];
+    if let Some(px) = o.text_scroll {
+        caption_rows.push(setting(tr("How fast it runs"), Some(tr("Faster needs fewer frames, so it uploads sooner")),
+                                  widgets::ranged(px as i32, 1, 20, &tr(" px a frame"), |v| wrap(Msg::ScrollSpeed(v)))));
+    }
+    caption_rows.extend([
+        setting(tr("Outline"), Some(tr("A dark edge around the letters instead of a shadow, for busy pictures")),
+                toggler(o.text_outline).on_toggle(|v| wrap(Msg::Outline(v))).style(theme::switch)),
         setting(tr("Position"), None, iced::widget::pick_list(positions, current_pos, |p| wrap(Msg::TextPos(p)))
             .style(theme::pick).menu_style(theme::menu).width(200)),
         setting(tr("Size"), None, widgets::ranged(o.text_size as i32, 8, 48, " px", |v| wrap(Msg::TextSize(v)))),
         setting(tr("Colour"), None, color_picker("color:screen:text".into(), o.text_color, app.drafts.get("color:screen:text"),
                                                    |c| Message::Draft("color:screen:text".into(), widgets::html(c)))),
-    ];
+    ]);
     let upload: Element<'_, Message> = match s.upload {
         Some(p) => {
             let left = s.upload_started.map(|t| {

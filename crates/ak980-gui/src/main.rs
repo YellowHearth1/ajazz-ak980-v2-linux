@@ -179,8 +179,8 @@ mod screenshots {
                 };
                 let iced_theme = app.theme();
                 // A picked Device page is drawn whole, so its settings at the bottom show too
-                let tall = page == Page::Device || (page == Page::Lighting && effect.is_some());
-                let size = if pick.is_some() && tall { (width, 1780.0) } else { (width, 820.0) };
+                let tall = page == Page::Device || page == Page::Screen || (page == Page::Lighting && effect.is_some());
+                let size = if pick.is_some() && tall { (width, if page == Page::Screen { 2600.0 } else { 1780.0 }) } else { (width, 820.0) };
                 let mut ui = iced_test::Simulator::with_size(settings, size, app.view());
                 let shot = ui.snapshot(&iced_theme).expect("drawn");
                 let mut stem = format!("{}-{theme}", format!("{page:?}").to_lowercase());

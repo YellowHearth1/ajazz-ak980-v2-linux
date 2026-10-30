@@ -11,7 +11,7 @@ use ak980_core::device::{self, AnyKeyboard, Dongle, Link, WiredKeyboard, LCD_MAX
 use ak980_core::effects::{self, ParamKind, EFFECTS};
 use ak980_core::i18n::{self, plural, tr};
 use ak980_core::keymap::{encode_layer, KeyAction, LAUNCHER_KEYS};
-use ak980_core::lcd::{self, Fit, RenderOptions, Source, TEXT_POSITIONS};
+use ak980_core::lcd::{self, Fit, Order, RenderOptions, Source, Tone, TEXT_POSITIONS};
 use ak980_core::lighting::{self, CAP_COLOR, DIRECTIONS, LIGHT_MODES, SIDE_LIGHT_MODES, SLEEP_CHOICES};
 use ak980_core::macros::{self, Macro, BUDGET_BYTES};
 use ak980_core::profiles::{self, ALL_PARTS};
@@ -99,8 +99,20 @@ fn build() -> Command {
                 .arg(Arg::new("file").value_parser(value_parser!(PathBuf)))
                 .arg(Arg::new("fit").long("fit").value_parser(["fit", "fill", "stretch"]).default_value("fit"))
                 .arg(color_arg("background").default_value("000000"))
+                .arg(Arg::new("rotate").long("rotate").value_parser(["0", "90", "180", "270"]).default_value("0")
+                    .help(tr("turn the picture clockwise, in degrees")))
+                .arg(Arg::new("zoom").long("zoom").value_parser(value_parser!(f32)).default_value("1.0")
+                    .help(tr("show a part of the picture: 2 is its middle half")))
+                .arg(Arg::new("pan").long("pan").value_name("X,Y").value_parser(parse_pan).allow_hyphen_values(true)
+                    .help(tr("which part a zoom shows, -1..1 each: -1,-1 the top left corner")))
+                .arg(flag("sharp", tr("no smoothing when scaling, for pixel art")))
                 .arg(Arg::new("flip-h").long("flip-h").action(ArgAction::SetTrue))
                 .arg(Arg::new("flip-v").long("flip-v").action(ArgAction::SetTrue))
+                .arg(Arg::new("tone").long("tone").value_parser(["natural", "grey", "sepia", "negative"]).default_value("natural"))
+                .arg(Arg::new("hue").long("hue").value_parser(value_parser!(i32).range(-180..=180)).default_value("0")
+                    .allow_hyphen_values(true).help(tr("shift every colour's hue, in degrees")))
+                .arg(Arg::new("order").long("order").value_parser(["forward", "backward", "bounce"]).default_value("forward")
+                    .help(tr("play order; bounce plays forward and back again")))
                 .arg(Arg::new("brightness").long("brightness").value_parser(value_parser!(f32)).default_value("1.0"))
                 .arg(Arg::new("contrast").long("contrast").value_parser(value_parser!(f32)).default_value("1.0"))
                 .arg(Arg::new("saturation").long("saturation").value_parser(value_parser!(f32)).default_value("1.0"))
@@ -115,6 +127,10 @@ fn build() -> Command {
                 .arg(color_arg("text-color").default_value("ffffff"))
                 .arg(Arg::new("text-size").long("text-size").value_parser(value_parser!(u32)).default_value("18"))
                 .arg(Arg::new("text-pos").long("text-pos").value_parser(TEXT_POSITIONS).default_value("bottom-right"))
+                .arg(Arg::new("scroll").long("scroll").value_name("PX").num_args(0..=1).default_missing_value("6")
+                    .value_parser(value_parser!(u32).range(1..=20))
+                    .help(tr("run the text across the screen, PX pixels a frame (6 without a number)")))
+                .arg(flag("outline", tr("a dark outline around the text instead of a shadow")))
                 .arg(Arg::new("no-dither").long("no-dither").action(ArgAction::SetTrue))
                 .arg(Arg::new("slot").long("slot").value_parser(value_parser!(u8)))
                 .arg(Arg::new("preview").long("preview").value_name("OUT.gif").value_parser(value_parser!(PathBuf))
@@ -436,14 +452,28 @@ fn cmd_time(m: &ArgMatches, cfg: &Config) -> Result<()> {
     Ok(())
 }
 
+/// `X,Y` with each between -1 and 1.
+fn parse_pan(s: &str) -> std::result::Result<(f32, f32), String> {
+    let (x, y) = s.split_once(',').ok_or_else(|| tr("write it as X,Y, for example 0.5,-1"))?;
+    let num = |v: &str| v.trim().parse::<f32>().ok().filter(|n| (-1.0..=1.0).contains(n));
+    num(x).zip(num(y)).ok_or_else(|| tr("write it as X,Y, for example 0.5,-1"))
+}
+
 fn render_options(m: &ArgMatches) -> RenderOptions {
     let num = |id: &str| m.get_one::<f32>(id).copied().unwrap_or(1.0);
     let count = |id: &str| m.get_one::<usize>(id).copied().unwrap_or(0);
     RenderOptions {
         fit: m.get_one::<String>("fit").and_then(|f| Fit::by_id(f)).unwrap_or_default(),
         background: m.get_one::<[u8; 3]>("background").copied().unwrap_or([0, 0, 0]),
+        rotate: m.get_one::<String>("rotate").and_then(|r| r.parse::<u16>().ok()).map_or(0, |d| (d / 90 % 4) as u8),
+        zoom: m.get_one::<f32>("zoom").copied().unwrap_or(1.0).clamp(1.0, 8.0),
+        pan: m.get_one::<(f32, f32)>("pan").copied().unwrap_or((0.0, 0.0)),
+        sharp: m.get_flag("sharp"),
         flip_h: m.get_flag("flip-h"),
         flip_v: m.get_flag("flip-v"),
+        tone: m.get_one::<String>("tone").and_then(|t| Tone::by_id(t)).unwrap_or_default(),
+        hue: m.get_one::<i32>("hue").copied().unwrap_or(0),
+        order: m.get_one::<String>("order").and_then(|o| Order::by_id(o)).unwrap_or_default(),
         brightness: num("brightness"),
         contrast: num("contrast"),
         saturation: num("saturation"),
@@ -456,6 +486,8 @@ fn render_options(m: &ArgMatches) -> RenderOptions {
         text_color: m.get_one::<[u8; 3]>("text-color").copied().unwrap_or([255, 255, 255]),
         text_size: m.get_one::<u32>("text-size").copied().unwrap_or(18),
         text_pos: m.get_one::<String>("text-pos").cloned().unwrap_or_else(|| "bottom-right".into()),
+        text_scroll: m.get_one::<u32>("scroll").copied(),
+        text_outline: m.get_flag("outline"),
         dither: !m.get_flag("no-dither"),
         ..RenderOptions::default()
     }
