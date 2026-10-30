@@ -114,7 +114,7 @@ uninstall:
 dist:
 	mkdir -p dist
 	tar --exclude-vcs --exclude="__pycache__" --exclude=".pytest_cache" --exclude="./dist" --exclude="./build" \
-	    --exclude="*.egg-info" --exclude="./.claude" --exclude="./target" \
+	    --exclude="*.egg-info" --exclude="./.claude" --exclude="./CLAUDE.md" --exclude="./target" \
 	    --exclude="./packaging/arch/src" --exclude="./packaging/arch/pkg" --exclude="*.pkg.tar.*" \
 	    --exclude="*.AppImage" --exclude="./packaging/arch/*.tar.gz" \
 	    --transform "s|^\.|$(SLUG)-$(VERSION)|" -czf dist/$(SLUG)-$(VERSION).tar.gz .

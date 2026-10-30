@@ -10,7 +10,7 @@ pkgname=(ajazz-ak980-v2-linux
          ajazz-ak980-v2-linux-dinit
          ajazz-ak980-v2-linux-runit
          ajazz-ak980-v2-linux-s6)
-pkgver=0.0.2
+pkgver=0.0.3
 pkgrel=1
 pkgdesc="Ajazz AK980 V2 | Software for Linux: screen clock and GIFs, lighting, PC lighting effects, keys, macros, profiles"
 arch=(x86_64 aarch64)
@@ -19,7 +19,7 @@ license=(MIT Ubuntu-font-1.0)      # the Ubuntu fonts are built into the window
 makedepends=(cargo)
 source=("$pkgbase-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
 # Run updpkgsums after tagging a release; the tarball GitHub serves is the one that counts.
-sha256sums=('7d584e98165d4164d78a188c66bc62fd634a2b78e41f99c6a28a9adb71625a38')
+sha256sums=('SKIP')
 
 prepare() {
   cd "$pkgbase-$pkgver"

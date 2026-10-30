@@ -49,6 +49,12 @@
   </categories>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.0.3" date="2026-10-30" type="development">
+      <description>
+        <p>The clock is set once a week by default, so the animation stays on the screen; reminders; a
+        calibration page for the LEDs' colours; three more AK980 colourways and themes; a colour wheel.</p>
+      </description>
+    </release>
     <release version="0.0.2" date="2026-10-30" type="development">
       <description>
         <p>Written in Rust: a new window with two themes taken from the AK980 V2's colourways, a smaller

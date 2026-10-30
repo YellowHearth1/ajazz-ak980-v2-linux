@@ -39,7 +39,7 @@ dependencies = [
 
 [[package]]
 name = "ak980"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
  "ak980-core",
  "clap",
@@ -49,7 +49,7 @@ dependencies = [
 
 [[package]]
 name = "ak980-core"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
  "ab_glyph",
  "image",
@@ -63,7 +63,7 @@ dependencies = [
 
 [[package]]
 name = "ak980-gui"
-version = "0.0.2"
+version = "0.0.3"
 dependencies = [
  "ak980-core",
  "iced",
