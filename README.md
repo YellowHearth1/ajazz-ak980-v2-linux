@@ -1,5 +1,12 @@
 # Ajazz AK980 V2 | Software for Linux
 
+> [!WARNING]
+> **This program was written entirely by artificial intelligence.** Its author needed software like
+> this for the keyboard but does not have the skills to write it, and so asked Claude, a large
+> language model made by Anthropic, to make it. All of its code and documentation were written by
+> Claude at the author's request; the author tried it out on their own AK980 V2. Use it at your own
+> risk and expect mistakes.
+
 [Українська](README.uk.md) · [Protocol](docs/PROTOCOL.md) · [Design](docs/DESIGN.md) · [Changelog](CHANGELOG.md)
 
 Configuration software for the **AJAZZ AK980 V2** keyboard that runs on Linux. The vendor's driver
@@ -9,7 +16,8 @@ reactive typing, fire), and profiles switch when a game starts.
 
 Version 0.0.2 is a rewrite in Rust (the window uses [iced](https://iced.rs)) and a **pre-release**:
 it has been checked on a real AK980 V2 over the 2.4 GHz receiver, and the checks over the cable are
-still being done. 0.0.1, the Python version, stays available on the releases page.
+still being done. 0.0.1, the Python version, is outdated: the project has gone another way, and it
+is no longer developed.
 
 ![Lighting effects computed on the PC, previewed on the keyboard itself](docs/screenshots/en/lighting-lavender.png)
 

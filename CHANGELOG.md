@@ -2,6 +2,10 @@
 
 ## 0.0.2 — unreleased (pre-release)
 
+> **Written entirely by artificial intelligence.** The author needed software like this for the
+> keyboard but does not have the skills to write it, and asked Claude, a large language model made by
+> Anthropic, to make it. Use it at your own risk and expect mistakes.
+
 The whole program is rewritten in Rust: the `ak980` command and agent, and a new window on iced.
 The bytes it sends to the keyboard are checked against what the Python version, verified on the
 keyboard, sends for every kind of setting. Published as a pre-release until every feature is checked
@@ -57,6 +61,9 @@ over the cable too.
   left in `/etc/udev/rules.d`.
 
 ## 0.0.1 — 2026-10-29
+
+**Outdated.** The Python version; the project has gone another way, and 0.0.1 is no longer
+developed. Use 0.0.2 or later.
 
 First public release.
 
