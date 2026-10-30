@@ -14,7 +14,7 @@
 
 use std::sync::RwLock;
 
-use iced::theme::palette::{self, Background, Danger, Extended, Pair, Primary, Secondary, Success, Warning};
+use iced::theme::palette::{Background, Danger, Extended, Pair, Primary, Secondary, Success, Warning};
 use iced::widget::{button, checkbox, container, overlay, pick_list, progress_bar, scrollable, slider, text_input,
                    toggler};
 use iced::{Border, Color, Shadow, Theme, Vector};
@@ -722,10 +722,6 @@ pub fn progress(_: &Theme) -> progress_bar::Style {
         border: border(Color::TRANSPARENT, 0.0, 3.0),
     }
 }
-
-/// Unused import guard: `palette` names the module the Extended types come from.
-#[allow(dead_code)]
-type _Palette = palette::Palette;
 
 #[cfg(test)]
 mod tests {

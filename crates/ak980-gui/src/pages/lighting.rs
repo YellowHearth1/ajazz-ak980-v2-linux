@@ -71,11 +71,6 @@ fn send(app: &mut App) -> Task<Message> {
     )
 }
 
-/// Nothing to do after other keyboard work; kept for the app's Done handler.
-pub fn after_send(_app: &mut App) -> Task<Message> {
-    Task::none()
-}
-
 pub fn set_color(app: &mut App, what: &str, c: [u8; 3]) -> Task<Message> {
     if what == "firmware" {
         let p = app.cfg.profile_mut();

@@ -9,7 +9,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use ak980_core::layout::{self, LayoutKey, CASE_RECT, KNOB_CENTER, KNOB_RADIUS, SCREEN_RECT};
 use iced::mouse::{self, Cursor};
 use iced::widget::canvas::{self, Action, Frame, Geometry, Path, Stroke, Text};
-use iced::{alignment, Color, Font, Pixels, Point, Rectangle, Renderer, Size, Theme};
+use iced::{alignment, Color, Pixels, Point, Rectangle, Renderer, Size, Theme};
 
 use crate::fonts;
 use crate::theme::{self, mix, Colorway};
@@ -265,10 +265,6 @@ impl<Message> Keyboard<'_, Message> {
         }
     }
 }
-
-/// The font the legends use, re-exported for the screen preview.
-#[allow(dead_code)]
-pub const LEGEND_FONT: Font = fonts::MEDIUM;
 
 #[cfg(test)]
 mod tests {

@@ -301,7 +301,7 @@ impl App {
                     Ok(_) => {}
                     Err(e) => self.notify(e, true),
                 }
-                pages::lighting::after_send(self)
+                Task::none()
             }
             Message::SwitchProfile(name) => pages::profiles::use_profile(self, name),
             Message::Draft(id, value) => {
