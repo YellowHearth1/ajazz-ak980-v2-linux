@@ -1,7 +1,7 @@
 pkgbase = ajazz-ak980-v2-linux
 	pkgdesc = Ajazz AK980 V2 | Software for Linux: screen clock and GIFs, lighting, PC lighting effects, keys, macros, profiles
 	pkgver = 0.0.3
-	pkgrel = 1
+	pkgrel = 2
 	url = https://github.com/yellowhearth1/ajazz-ak980-v2-linux
 	arch = x86_64
 	arch = aarch64
