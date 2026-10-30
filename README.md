@@ -1,3 +1,15 @@
+<p align="center">
+  <a href="https://standforukraine.com/"><img src="https://yellowhearth1.neocities.org/img/support-ukraine-full.webp" alt="Support Ukraine" width="520"></a>
+</p>
+
+<p align="center">
+  <b>Ukraine is defending itself against Russia's full-scale invasion.</b><br>
+  Support the Armed Forces of Ukraine and humanitarian aid through vetted funds and charities:<br>
+  <a href="https://standforukraine.com/"><b>standforukraine.com</b></a>
+</p>
+
+---
+
 # Ajazz AK980 V2 | Software for Linux
 
 > [!WARNING]

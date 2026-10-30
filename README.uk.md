@@ -1,3 +1,15 @@
+<p align="center">
+  <a href="https://standforukraine.com/"><img src="https://yellowhearth1.neocities.org/img/support-ukraine-full.webp" alt="Підтримай Україну" width="520"></a>
+</p>
+
+<p align="center">
+  <b>Україна захищається від повномасштабного вторгнення Росії.</b><br>
+  Підтримай Збройні сили України й гуманітарну допомогу через перевірені фонди:<br>
+  <a href="https://standforukraine.com/"><b>standforukraine.com</b></a>
+</p>
+
+---
+
 # Ajazz AK980 V2 | Software for Linux
 
 > [!WARNING]
