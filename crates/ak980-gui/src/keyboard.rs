@@ -249,12 +249,12 @@ impl<Message> Keyboard<'_, Message> {
         // Marks: remapped keys get a dot, the selection an outline in the accent
         if self.marked.contains(&key.index) {
             let dot = Path::circle(Point::new(top_pos.x + top_size.width - 3.6 * s, top_pos.y + 3.6 * s), 2.1 * s);
-            frame.fill(&dot, r.accent);
-            frame.stroke(&dot, Stroke::default().with_color(mix(r.accent, Color::BLACK, 0.45)).with_width(0.8));
+            frame.fill(&dot, r.accent_mark);
+            frame.stroke(&dot, Stroke::default().with_color(mix(r.accent_mark, Color::BLACK, 0.45)).with_width(0.8));
         }
         let outline = Path::rounded_rectangle(Point::new(x + 0.5, y + 0.5), Size::new(w - 1.0, h - 1.0), (5.0 * s).into());
         if self.selected.contains(&key.index) {
-            frame.stroke(&outline, Stroke::default().with_color(r.accent).with_width((2.4 * s).max(2.0)));
+            frame.stroke(&outline, Stroke::default().with_color(r.accent_mark).with_width((2.4 * s).max(2.0)));
         } else if hovered && self.mode != Mode::View {
             frame.stroke(&outline, Stroke::default().with_color(theme::alpha(r.text, 0.55)).with_width(1.5));
         }

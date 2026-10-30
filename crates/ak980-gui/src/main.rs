@@ -110,14 +110,34 @@ mod screenshots {
             std::env::set_var("XDG_DATA_HOME", home.join("data"));
             std::env::set_var("XDG_STATE_HOME", home.join("state"));
         }
-        for lang in ["en", "uk"] {
+        // AK980_SHOTS_PICK=lighting:mocha,device:latte:graphite:yellow renders just those
+        // (page:theme[:colourway[:accent]]), in English, to look at a theme
+        let pick = std::env::var("AK980_SHOTS_PICK").ok();
+        let shots: Vec<(Page, String, String, String)> = match &pick {
+            Some(list) => list
+                .split(',')
+                .filter_map(|item| {
+                    let mut parts = item.split(':');
+                    let name = parts.next()?;
+                    let page = SHOTS.iter().map(|(p, _)| *p).find(|p| format!("{p:?}").eq_ignore_ascii_case(name))?;
+                    let mut next = |default: &str| parts.next().unwrap_or(default).to_string();
+                    Some((page, next("auto"), next("auto"), next("mauve")))
+                })
+                .collect(),
+            None => SHOTS.iter().map(|(p, t)| (*p, t.to_string(), "auto".into(), "mauve".into())).collect(),
+        };
+        let langs: &[&str] = if pick.is_some() { &["en"] } else { &["en", "uk"] };
+        for &lang in langs {
             ak980_core::i18n::set_language(lang);
             let dir = std::path::Path::new(&out).join(lang);
             let _ = std::fs::remove_dir_all(&dir);
-            for (page, theme) in SHOTS {
+            for (page, theme, colorway, accent) in &shots {
+                let (page, theme) = (*page, theme.as_str());
                 let (mut app, _) = App::boot();
                 demo(&mut app);
                 app.cfg.settings.theme = theme.into();
+                app.cfg.settings.colorway.clone_from(colorway);
+                app.cfg.settings.accent.clone_from(accent);
                 app.apply_theme();
                 app.page = page;
                 app.keys.draft = app.cfg.profile().keymap_top[&119].clone();
@@ -138,9 +158,14 @@ mod screenshots {
                     ..Default::default()
                 };
                 let iced_theme = app.theme();
-                let mut ui = iced_test::Simulator::with_size(settings, (1240.0, 820.0), app.view());
+                // A picked Device page is drawn whole, so its settings at the bottom show too
+                let size = if pick.is_some() && page == Page::Device { (1240.0, 1780.0) } else { (1240.0, 820.0) };
+                let mut ui = iced_test::Simulator::with_size(settings, size, app.view());
                 let shot = ui.snapshot(&iced_theme).expect("drawn");
-                let stem = format!("{}-{theme}", format!("{page:?}").to_lowercase());
+                let mut stem = format!("{}-{theme}", format!("{page:?}").to_lowercase());
+                if pick.is_some() {
+                    stem = format!("{stem}-{colorway}-{accent}");
+                }
                 assert!(shot.matches_image(dir.join(&stem)).expect("written"));
                 // The simulator names the file after its renderer and draws at twice the size
                 let written = std::fs::read_dir(&dir).unwrap().filter_map(|e| e.ok()).map(|e| e.path())

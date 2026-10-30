@@ -54,8 +54,12 @@ pub struct Roles {
     pub subtext0: Color,
     pub subtext1: Color,
     pub text: Color,
-    /// Primary actions, the selection, focus.
+    /// Primary actions and the selection, as a fill.
     pub accent: Color,
+    /// Text and icons on an accent fill.
+    pub on_accent: Color,
+    /// The accent as a line or mark on the page (focus, sliders, switches): 3:1 off the grounds.
+    pub accent_mark: Color,
     /// The second colour of the colourway (graphite caps, sky-blue caps), for quiet highlights.
     pub second: Color,
     pub success: Color,
@@ -136,6 +140,8 @@ pub const GRAPHITE: Roles = Roles {
     subtext1: hex(0xC2C3C5),
     text: hex(0xE2E2DE),
     accent: hex(0xF2CF2E),
+    on_accent: hex(0x1B1C20),
+    accent_mark: hex(0xF2CF2E),
     second: hex(0x7B7C7F),
     success: hex(0x8FCF7A),
     warning: hex(0xF0A35A),
@@ -158,6 +164,8 @@ pub const LAVENDER: Roles = Roles {
     subtext1: hex(0x524A7A),
     text: hex(0x2C2847),
     accent: hex(0x6F5CC9),
+    on_accent: hex(0xF7F6FB),
+    accent_mark: hex(0x6F5CC9),
     second: hex(0xA9CBE3),
     success: hex(0x2E8B57),
     warning: hex(0xA86200),
@@ -220,6 +228,8 @@ fn catppuccin(f: &Flavour, accent: &str) -> Roles {
         subtext1: c(15),
         text,
         accent: c(ACCENTS.iter().position(|(id, _)| *id == accent).unwrap_or(3)),
+        on_accent: base,
+        accent_mark: base,
         second: c(13),
         success: c(8),
         warning: c(6),
@@ -238,7 +248,23 @@ fn catppuccin(f: &Flavour, accent: &str) -> Roles {
     for status in [&mut r.success, &mut r.warning, &mut r.danger] {
         *status = readable(*status, text, &[r.surface0], 3.0);
     }
-    r.accent = readable(r.accent, text, &[r.base], 4.5); // text on the accent is `base`
+    // A fill keeps the palette's accent and takes `base` (Catppuccin's text on accents) or, when
+    // that is too faint, the darkest or lightest text that reads at 4.5:1; only if neither does is
+    // the fill itself moved, away from `base`. Shading towards black or white keeps the hue.
+    let (dark_end, light_end) = (Color::BLACK, Color::WHITE);
+    let away = if f.dark { light_end } else { dark_end };
+    let other = readable(text, if f.dark { light_end } else { dark_end }, &[r.accent], 4.5);
+    if contrast(r.base, r.accent) >= 4.5 {
+        r.on_accent = r.base;
+    } else if contrast(other, r.accent) >= 4.5 {
+        r.on_accent = other;
+    } else {
+        r.accent = readable(r.accent, away, &[r.base], 4.5);
+        r.on_accent = r.base;
+    }
+    // Thin marks on the page need 3:1 against every ground they sit on
+    r.accent_mark = readable(c(ACCENTS.iter().position(|(id, _)| *id == accent).unwrap_or(3)),
+                             if f.dark { light_end } else { dark_end }, &[r.base, r.mantle, r.surface0], 3.0);
     r
 }
 
@@ -349,7 +375,7 @@ pub fn activate(r: Roles) -> Theme {
 }
 
 fn extended(r: &Roles) -> Extended {
-    let on_accent = r.base;
+    let (on_accent, on_status) = (r.on_accent, r.base);
     let weak = |c: Color| mix(r.base, c, 0.22);
     Extended {
         background: Background {
@@ -372,12 +398,12 @@ fn extended(r: &Roles) -> Extended {
             weak: pair(weak(r.second), r.text),
             strong: pair(mix(r.second, r.text, 0.2), r.text),
         },
-        success: Success { base: pair(r.success, on_accent), weak: pair(weak(r.success), r.text),
-                           strong: pair(mix(r.success, r.text, 0.15), on_accent) },
-        warning: Warning { base: pair(r.warning, on_accent), weak: pair(weak(r.warning), r.text),
-                           strong: pair(mix(r.warning, r.text, 0.15), on_accent) },
-        danger: Danger { base: pair(r.danger, on_accent), weak: pair(weak(r.danger), r.text),
-                         strong: pair(mix(r.danger, r.text, 0.15), on_accent) },
+        success: Success { base: pair(r.success, on_status), weak: pair(weak(r.success), r.text),
+                           strong: pair(mix(r.success, r.text, 0.15), on_status) },
+        warning: Warning { base: pair(r.warning, on_status), weak: pair(weak(r.warning), r.text),
+                           strong: pair(mix(r.warning, r.text, 0.15), on_status) },
+        danger: Danger { base: pair(r.danger, on_status), weak: pair(weak(r.danger), r.text),
+                         strong: pair(mix(r.danger, r.text, 0.15), on_status) },
         is_dark: r.dark,
     }
 }
@@ -493,7 +519,7 @@ pub fn primary(_: &Theme, status: button::Status) -> button::Style {
         button::Status::Disabled => alpha(r.accent, 0.35),
         button::Status::Active => r.accent,
     };
-    button_base(Some(bg), if status == button::Status::Disabled { alpha(r.base, 0.7) } else { r.base }, None)
+    button_base(Some(bg), if status == button::Status::Disabled { alpha(r.on_accent, 0.7) } else { r.on_accent }, None)
 }
 
 /// Everything else that is a button.
@@ -535,13 +561,19 @@ pub fn flat(_: &Theme, status: button::Status) -> button::Style {
 pub fn list_item(selected: bool) -> impl Fn(&Theme, button::Status) -> button::Style {
     move |_, status| {
         let r = roles();
+        let tint = mix(r.mantle, r.accent, if r.dark { 0.16 } else { 0.14 });
         let bg = match (selected, status) {
-            (true, _) => Some(mix(r.mantle, r.accent, if r.dark { 0.16 } else { 0.14 })),
+            (true, _) => Some(tint),
             (false, button::Status::Hovered) => Some(r.surface1),
             (false, button::Status::Pressed) => Some(r.surface2),
             _ => None,
         };
-        let text = if selected { if r.dark { r.accent } else { mix(r.accent, r.text, 0.35) } } else { r.text };
+        let text = if selected {
+            let start = if r.dark { r.accent_mark } else { mix(r.accent_mark, r.text, 0.35) };
+            readable(start, r.text, &[tint], 4.5)
+        } else {
+            r.text
+        };
         button_base(bg, text, None)
     }
 }
@@ -568,7 +600,7 @@ pub fn segment(selected: bool) -> impl Fn(&Theme, button::Status) -> button::Sty
 pub fn input(_: &Theme, status: text_input::Status) -> text_input::Style {
     let r = roles();
     let edge = match status {
-        text_input::Status::Focused { .. } => r.accent,
+        text_input::Status::Focused { .. } => r.accent_mark,
         text_input::Status::Hovered => r.overlay1,
         _ => alpha(r.overlay0, 0.9),
     };
@@ -585,7 +617,7 @@ pub fn input(_: &Theme, status: text_input::Status) -> text_input::Style {
 pub fn pick(_: &Theme, status: pick_list::Status) -> pick_list::Style {
     let r = roles();
     let edge = match status {
-        pick_list::Status::Opened { .. } => r.accent,
+        pick_list::Status::Opened { .. } => r.accent_mark,
         pick_list::Status::Hovered => r.overlay1,
         _ => alpha(r.overlay0, 0.9),
     };
@@ -604,7 +636,7 @@ pub fn menu(_: &Theme) -> overlay::menu::Style {
         background: r.surface1.into(),
         border: border(alpha(r.overlay0, 0.9), 1.0, RADIUS_SMALL),
         text_color: r.text,
-        selected_text_color: r.base,
+        selected_text_color: r.on_accent,
         selected_background: r.accent.into(),
         shadow: Shadow { color: alpha(Color::BLACK, 0.25), offset: Vector::new(0.0, 4.0), blur_radius: 12.0 },
     }
@@ -613,12 +645,12 @@ pub fn menu(_: &Theme) -> overlay::menu::Style {
 pub fn slider_style(_: &Theme, status: slider::Status) -> slider::Style {
     let r = roles();
     let handle = match status {
-        slider::Status::Hovered | slider::Status::Dragged => mix(r.accent, r.text, 0.1),
-        _ => r.accent,
+        slider::Status::Hovered | slider::Status::Dragged => mix(r.accent_mark, r.text, 0.1),
+        _ => r.accent_mark,
     };
     slider::Style {
         rail: slider::Rail {
-            backgrounds: (r.accent.into(), r.surface2.into()),
+            backgrounds: (r.accent_mark.into(), r.surface2.into()),
             width: 4.0,
             border: border(Color::TRANSPARENT, 0.0, 2.0),
         },
@@ -636,7 +668,7 @@ pub fn switch(_: &Theme, status: toggler::Status) -> toggler::Style {
     let on = matches!(status, toggler::Status::Active { is_toggled: true } | toggler::Status::Hovered { is_toggled: true });
     let hovered = matches!(status, toggler::Status::Hovered { .. });
     toggler::Style {
-        background: (if on { r.accent } else if hovered { r.overlay0 } else { r.surface2 }).into(),
+        background: (if on { r.accent_mark } else if hovered { r.overlay0 } else { r.surface2 }).into(),
         background_border_width: 0.0,
         background_border_color: Color::TRANSPARENT,
         foreground: (if on { r.base } else { r.subtext1 }).into(),
@@ -655,9 +687,9 @@ pub fn check(_: &Theme, status: checkbox::Status) -> checkbox::Style {
         | checkbox::Status::Disabled { is_checked } => is_checked,
     };
     checkbox::Style {
-        background: (if checked { r.accent } else { r.base }).into(),
+        background: (if checked { r.accent_mark } else { r.base }).into(),
         icon_color: r.base,
-        border: border(if checked { r.accent } else { r.overlay1 }, 1.0, 4.0),
+        border: border(if checked { r.accent_mark } else { r.overlay1 }, 1.0, 4.0),
         text_color: Some(r.text),
     }
 }
@@ -686,7 +718,7 @@ pub fn progress(_: &Theme) -> progress_bar::Style {
     let r = roles();
     progress_bar::Style {
         background: r.surface2.into(),
-        bar: r.accent.into(),
+        bar: r.accent_mark.into(),
         border: border(Color::TRANSPARENT, 0.0, 3.0),
     }
 }
@@ -741,7 +773,10 @@ mod tests {
             }
             // Hovered buttons and toasts sit on surface2
             assert!(contrast(r.text, r.surface2) >= 4.5, "{n}: text on surface2 {:.2}", contrast(r.text, r.surface2));
-            assert!(contrast(r.base, r.accent) >= 4.5, "{n}: text on the accent {:.2}", contrast(r.base, r.accent));
+            assert!(contrast(r.on_accent, r.accent) >= 4.5, "{n}: text on the accent {:.2}", contrast(r.on_accent, r.accent));
+            for (ground, g) in [(r.base, "base"), (r.mantle, "mantle"), (r.surface0, "surface0")] {
+                assert!(contrast(r.accent_mark, ground) >= 3.0, "{n}: accent mark on {g} {:.2}", contrast(r.accent_mark, ground));
+            }
             for (c, s) in [(r.danger, "danger"), (r.success, "success"), (r.warning, "warning")] {
                 assert!(contrast(c, r.surface0) >= 3.0, "{n}: {s} {:.2}", contrast(c, r.surface0));
             }
@@ -753,9 +788,14 @@ mod tests {
         // Mocha needs no change, so its colours are the palette's own
         let mocha = roles_for("mocha", "mauve", "auto", true);
         assert_eq!((mocha.accent, mocha.text, mocha.base), (hex(0xcba6f7), hex(0xcdd6f4), hex(0x1e1e2e)));
-        // Latte's yellow is too light under white text: darkened, not replaced
+        // Latte's yellow keeps its colour as a fill and gets dark text; its marks are a darker yellow
         let latte = roles_for("latte", "yellow", "auto", false);
-        assert!(luminance(latte.accent) < luminance(hex(0xdf8e1d)) && latte.accent.r > latte.accent.b);
+        assert_eq!(latte.accent, hex(0xdf8e1d));
+        assert!(luminance(latte.on_accent) < luminance(latte.accent) && luminance(latte.accent_mark) < luminance(latte.accent));
+        assert!(latte.accent_mark.r > latte.accent_mark.b, "the mark keeps the hue: {:?}", latte.accent_mark);
+        // Latte's blue reads under neither white nor black at 4.5:1, so only that fill is darkened
+        let blue = roles_for("latte", "blue", "auto", false);
+        assert!(luminance(blue.accent) < luminance(hex(0x1e66f5)) && blue.accent.b > blue.accent.r);
         assert!(!latte.dark && roles_for("latte", "nonsense", "auto", false).accent != Color::BLACK);
     }
 
