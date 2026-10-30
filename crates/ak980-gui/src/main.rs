@@ -72,6 +72,33 @@ mod screenshots {
         app.keys.selected = Some(119);
     }
 
+    /// The pages the README shows, each in the theme it is shown in.
+    const SHOTS: [(Page, &str); 8] = [
+        (Page::Lighting, "graphite"),
+        (Page::Lighting, "lavender"),
+        (Page::Colours, "graphite"),
+        (Page::Keys, "lavender"),
+        (Page::Macros, "lavender"),
+        (Page::Screen, "graphite"),
+        (Page::Profiles, "lavender"),
+        (Page::Device, "graphite"),
+    ];
+
+    /// Twelve frames of a slow rainbow with a caption, as a stand-in for someone's GIF.
+    fn demo_animation() -> ak980_core::lcd::Source {
+        let frames = (0..12)
+            .map(|i| {
+                let img = image::RgbaImage::from_fn(240, 135, |x, y| {
+                    let h = (x as f32 / 240.0 + i as f32 / 12.0) % 1.0;
+                    let c = ak980_core::effects::hsv(h, 0.55, 0.35 + 0.65 * (1.0 - y as f32 / 135.0));
+                    image::Rgba([(c[0] * 255.0) as u8, (c[1] * 255.0) as u8, (c[2] * 255.0) as u8, 255])
+                });
+                (img, 80)
+            })
+            .collect();
+        ak980_core::lcd::Source { frames }
+    }
+
     #[test]
     #[ignore = "writes PNG files; run with --ignored"]
     fn screenshots() {
@@ -83,31 +110,46 @@ mod screenshots {
             std::env::set_var("XDG_DATA_HOME", home.join("data"));
             std::env::set_var("XDG_STATE_HOME", home.join("state"));
         }
-        let _ = std::fs::remove_dir_all(&out);
         for lang in ["en", "uk"] {
             ak980_core::i18n::set_language(lang);
-            for theme in ["graphite", "lavender"] {
-                for page in Page::ALL {
-                    let (mut app, _) = App::boot();
-                    demo(&mut app);
-                    if page == Page::Lighting && theme == "lavender" {
-                        app.cfg.profile_mut().light_source = LightSource::Custom;
-                    }
-                    app.cfg.settings.theme = theme.into();
-                    app.apply_theme();
-                    app.page = page;
-                    app.keys.draft = app.cfg.profile().keymap_top[&119].clone();
-                    let settings = iced::Settings {
-                        fonts: fonts::FILES.iter().map(|f| Cow::Borrowed(*f)).collect(),
-                        default_font: fonts::REGULAR,
-                        ..Default::default()
-                    };
-                    let iced_theme = app.theme();
-                    let mut ui = iced_test::Simulator::with_size(settings, (1240.0, 820.0), app.view());
-                    let shot = ui.snapshot(&iced_theme).expect("drawn");
-                    let name = format!("{out}/{lang}/{theme}-{}", format!("{page:?}").to_lowercase());
-                    assert!(shot.matches_image(&name).expect("written"));
+            let dir = std::path::Path::new(&out).join(lang);
+            let _ = std::fs::remove_dir_all(&dir);
+            for (page, theme) in SHOTS {
+                let (mut app, _) = App::boot();
+                demo(&mut app);
+                app.cfg.settings.theme = theme.into();
+                app.apply_theme();
+                app.page = page;
+                app.keys.draft = app.cfg.profile().keymap_top[&119].clone();
+                if page == Page::Lighting && theme == "lavender" {
+                    // The PC effects tab, with a frame of the rainbow wave on the drawing
+                    app.cfg.profile_mut().light_source = LightSource::Host;
+                    let t0 = std::time::Instant::now();
+                    crate::pages::lighting::tick(&mut app, t0);
+                    crate::pages::lighting::tick(&mut app, t0 + std::time::Duration::from_millis(900));
                 }
+                if page == Page::Screen {
+                    app.screen.options.text = "12:34".into();
+                    crate::pages::screen::show_now(&mut app, demo_animation(), "rainbow.gif".into());
+                }
+                let settings = iced::Settings {
+                    fonts: fonts::FILES.iter().map(|f| Cow::Borrowed(*f)).collect(),
+                    default_font: fonts::REGULAR,
+                    ..Default::default()
+                };
+                let iced_theme = app.theme();
+                let mut ui = iced_test::Simulator::with_size(settings, (1240.0, 820.0), app.view());
+                let shot = ui.snapshot(&iced_theme).expect("drawn");
+                let stem = format!("{}-{theme}", format!("{page:?}").to_lowercase());
+                assert!(shot.matches_image(dir.join(&stem)).expect("written"));
+                // The simulator names the file after its renderer and draws at twice the size
+                let written = std::fs::read_dir(&dir).unwrap().filter_map(|e| e.ok()).map(|e| e.path())
+                    .find(|p| p.file_name().is_some_and(|n| n.to_string_lossy().starts_with(&format!("{stem}-"))))
+                    .expect("the snapshot file");
+                let img = image::open(&written).expect("a PNG").to_rgba8();
+                let half = image::imageops::resize(&img, img.width() / 2, img.height() / 2, image::imageops::FilterType::Triangle);
+                half.save(dir.join(format!("{stem}.png"))).expect("saved");
+                std::fs::remove_file(written).unwrap();
             }
         }
         let _ = std::fs::remove_dir_all(&home);

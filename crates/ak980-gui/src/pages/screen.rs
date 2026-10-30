@@ -89,6 +89,29 @@ fn load(app: &mut App, path: PathBuf) -> Task<Message> {
     })
 }
 
+/// The frames as the panel shows them (RGBA), and how many frames the options select in all.
+fn preview(src: &Source, o: &RenderOptions) -> (Vec<(Vec<u8>, u32)>, usize) {
+    let frames = src.render(o, LCD_MAX_FRAMES);
+    let shown = frames
+        .iter()
+        .map(|(f, d)| {
+            let rgb = lcd::preview_565(f, o.dither);
+            let rgba: Vec<u8> = rgb.pixels().flat_map(|p| [p.0[0], p.0[1], p.0[2], 255]).collect();
+            (rgba, *d)
+        })
+        .collect::<Vec<_>>();
+    (shown, src.available(o))
+}
+
+/// Shows `src` at once, without a background task (for the screenshots).
+#[cfg(test)]
+pub fn show_now(app: &mut App, src: Source, path: PathBuf) {
+    let (frames, available) = preview(&src, &app.screen.options);
+    app.screen.source = Some(Arc::new(src));
+    app.screen.path = Some(path);
+    let _ = update(app, Msg::Rendered(frames, available));
+}
+
 fn render(app: &mut App) -> Task<Message> {
     let Some(src) = app.screen.source.clone() else { return Task::none() };
     if app.screen.rendering {
@@ -98,18 +121,7 @@ fn render(app: &mut App) -> Task<Message> {
     app.screen.rendering = true;
     let o = app.screen.options.clone();
     Task::perform(
-        blocking(move || {
-            let frames = src.render(&o, LCD_MAX_FRAMES);
-            let shown = frames
-                .iter()
-                .map(|(f, d)| {
-                    let rgb = lcd::preview_565(f, o.dither);
-                    let rgba: Vec<u8> = rgb.pixels().flat_map(|p| [p.0[0], p.0[1], p.0[2], 255]).collect();
-                    (rgba, *d)
-                })
-                .collect::<Vec<_>>();
-            (shown, src.available(&o))
-        }),
+        blocking(move || preview(&src, &o)),
         |r| {
             let (frames, available) = r.unwrap_or_default();
             wrap(Msg::Rendered(frames, available))
@@ -315,13 +327,15 @@ pub fn view(app: &App) -> Element<'_, Message> {
     });
     let name = s.path.as_ref().and_then(|p| p.file_name()).map(|n| n.to_string_lossy().to_string()).unwrap_or_default();
     let pages = lcd::page_count(s.frames.len());
-    let info = if s.frames.is_empty() {
-        String::new()
-    } else {
-        format!("{} · {} · {}", plural(s.frames.len() as i64, "{n} frame", "{n} frames"),
-                tr!("upload ≈ {s} s", s = (pages as f32 * SECONDS_PER_PAGE).round()),
-                if s.available > s.frames.len() { tr!("{used} of {total} frames fit", used = s.frames.len(), total = s.available) } else { String::new() })
-    };
+    let mut parts = vec![];
+    if !s.frames.is_empty() {
+        parts.push(plural(s.frames.len() as i64, "{n} frame", "{n} frames"));
+        parts.push(tr!("upload ≈ {s} s", s = (pages as f32 * SECONDS_PER_PAGE).round()));
+        if s.available > s.frames.len() {
+            parts.push(tr!("{used} of {total} frames fit", used = s.frames.len(), total = s.available));
+        }
+    }
+    let info = parts.join(" · ");
     let top = row![
         column![
             bezel,
@@ -437,7 +451,7 @@ fn history(app: &App) -> Element<'_, Message> {
     }
     column![
         widgets::heading(tr("Earlier uploads")),
-        container(scrollable(list).style(theme::scroll).height(Length::Fixed(300.0))).padding(6).style(theme::card),
+        container(scrollable(list).style(theme::scroll).height(Length::Fixed(300.0))).padding(6).width(Fill).style(theme::card),
     ]
     .spacing(8)
     .width(Fill)
