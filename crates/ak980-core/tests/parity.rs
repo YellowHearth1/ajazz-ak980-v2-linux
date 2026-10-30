@@ -254,6 +254,7 @@ fn deterministic_effects_match_python() {
                 bands: bands.clone(),
                 level: 0.6,
                 beat: i == 1,
+                system: [0.0; 3],
             };
             let got = effects::to_bytes(&e.render(*t, 0.5, &inp), leds, 0.8);
             let want = unhex(expected.as_str().unwrap());

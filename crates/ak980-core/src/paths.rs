@@ -53,4 +53,9 @@ pub fn link_log() -> PathBuf {
     state_dir().join("link.log")
 }
 
+/// The keyboard's charge over time, from the agent's checks over 2.4 GHz.
+pub fn battery_log() -> PathBuf {
+    state_dir().join("battery.log")
+}
+
 pub const SYSTEM_CONFIG: &str = "/etc/ak980/agent.conf";

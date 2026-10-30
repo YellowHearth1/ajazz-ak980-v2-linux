@@ -6,6 +6,7 @@
 
 pub mod agent;
 pub mod audio;
+pub mod battery;
 pub mod config;
 pub mod device;
 pub mod effects;
@@ -24,6 +25,7 @@ pub mod permissions;
 pub mod profiles;
 pub mod runtime;
 pub mod service;
+pub mod sysinfo;
 pub mod time;
 
 pub use error::{Error, Result};

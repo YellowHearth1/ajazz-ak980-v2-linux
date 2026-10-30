@@ -48,6 +48,9 @@ pub const PALETTE_CHOICES: &[(&str, &str)] =
 const FIRE_PALETTES: &[(&str, &str)] = &[("fire", "Fire"), ("ice", "Ice"), ("amber", "Amber"), ("toxic", "Toxic")];
 const STYLE_CHOICES: &[(&str, &str)] = &[("key", "Pressed key"), ("ripple", "Ripple"), ("cross", "Cross")];
 const BAR_CHOICES: &[(&str, &str)] = &[("bars", "Bars"), ("glow", "Glow")];
+const SOURCE_CHOICES: &[(&str, &str)] =
+    &[("cpu", "Processor load"), ("memory", "Memory in use"), ("temperature", "Processor temperature")];
+const ROW_CHOICES: &[(&str, &str)] = &[("numbers", "Number row"), ("function", "F1–F12"), ("all", "Whole keyboard")];
 
 pub struct EffectInfo {
     pub id: &'static str,
@@ -57,16 +60,18 @@ pub struct EffectInfo {
     pub params: &'static [Param],
     pub needs_keys: bool,
     pub needs_audio: bool,
+    /// Reads the processor's load, the memory in use and the processor's temperature.
+    pub needs_system: bool,
 }
 
-pub const EFFECTS: [EffectInfo; 8] = [
+pub const EFFECTS: [EffectInfo; 10] = [
     EffectInfo {
         id: "wave", name: "Rainbow wave", description: "A rainbow that flows across the keys.",
         params: &[
             choice("direction", "Direction", "right", DIRECTION_CHOICES), range("speed", "Speed", 40, 0, 100),
             range("size", "Wave length", 100, 20, 300), range("saturation", "Saturation", 100, 0, 100),
         ],
-        needs_keys: false, needs_audio: false,
+        needs_keys: false, needs_audio: false, needs_system: false,
     },
     EffectInfo {
         id: "drift", name: "Colour drift", description: "Two colours slowly flowing into each other.",
@@ -75,7 +80,7 @@ pub const EFFECTS: [EffectInfo; 8] = [
             choice("direction", "Direction", "diagonal", DIRECTION_CHOICES), range("speed", "Speed", 25, 0, 100),
             range("size", "Wave length", 120, 20, 300),
         ],
-        needs_keys: false, needs_audio: false,
+        needs_keys: false, needs_audio: false, needs_system: false,
     },
     EffectInfo {
         id: "breath", name: "Breathing", description: "The whole keyboard fades in and out.",
@@ -84,7 +89,7 @@ pub const EFFECTS: [EffectInfo; 8] = [
             color("b", "Second colour", [40, 90, 255]), range("speed", "Speed", 30, 0, 100),
             range("floor", "Lowest brightness", 5, 0, 60),
         ],
-        needs_keys: false, needs_audio: false,
+        needs_keys: false, needs_audio: false, needs_system: false,
     },
     EffectInfo {
         id: "starlight", name: "Starlight", description: "Keys light up at random and slowly fade out.",
@@ -93,7 +98,7 @@ pub const EFFECTS: [EffectInfo; 8] = [
             color("star", "Star colour", [255, 220, 150]), range("density", "Density", 35, 0, 100),
             range("fade", "Fade time", 45, 0, 100),
         ],
-        needs_keys: false, needs_audio: false,
+        needs_keys: false, needs_audio: false, needs_system: false,
     },
     EffectInfo {
         id: "reactive", name: "Reactive",
@@ -103,7 +108,7 @@ pub const EFFECTS: [EffectInfo; 8] = [
             toggle("rainbow", "Rainbow", true), color("press", "Press colour", [255, 143, 31]),
             range("fade", "Fade time", 40, 0, 100), range("speed", "Ripple speed", 50, 0, 100),
         ],
-        needs_keys: true, needs_audio: false,
+        needs_keys: true, needs_audio: false, needs_system: false,
     },
     EffectInfo {
         id: "fire", name: "Fire", description: "Flames rising from the space bar.",
@@ -111,7 +116,7 @@ pub const EFFECTS: [EffectInfo; 8] = [
             choice("palette", "Colours", "fire", FIRE_PALETTES), range("height", "Flame height", 55, 0, 100),
             range("speed", "Speed", 45, 0, 100),
         ],
-        needs_keys: false, needs_audio: false,
+        needs_keys: false, needs_audio: false, needs_system: false,
     },
     EffectInfo {
         id: "spectrum", name: "Music: spectrum",
@@ -120,7 +125,7 @@ pub const EFFECTS: [EffectInfo; 8] = [
             choice("palette", "Colours", "rainbow", PALETTE_CHOICES), choice("style", "Style", "bars", BAR_CHOICES),
             range("sensitivity", "Sensitivity", 55, 0, 100),
         ],
-        needs_keys: false, needs_audio: true,
+        needs_keys: false, needs_audio: true, needs_system: false,
     },
     EffectInfo {
         id: "pulse", name: "Music: pulse", description: "The keyboard breathes with the loudness of the music.",
@@ -128,7 +133,26 @@ pub const EFFECTS: [EffectInfo; 8] = [
             color("a", "Quiet colour", [40, 10, 120]), color("b", "Loud colour", [255, 143, 31]),
             range("sensitivity", "Sensitivity", 55, 0, 100), toggle("from_centre", "Spread from the centre", true),
         ],
-        needs_keys: false, needs_audio: true,
+        needs_keys: false, needs_audio: true, needs_system: false,
+    },
+    EffectInfo {
+        id: "monitor", name: "System monitor",
+        description: "The processor's load, the memory in use or the processor's temperature as a bar on a row of keys.",
+        params: &[
+            choice("source", "Shows", "cpu", SOURCE_CHOICES), choice("row", "Where", "numbers", ROW_CHOICES),
+            color("low", "Low", [40, 200, 90]), color("high", "High", [255, 50, 30]),
+            color("background", "Other keys", [10, 12, 20]),
+        ],
+        needs_keys: false, needs_audio: false, needs_system: true,
+    },
+    EffectInfo {
+        id: "heatmap", name: "Typing heat map",
+        description: "Keys glow by how often you press them: the ones you use most burn brightest.",
+        params: &[
+            choice("palette", "Colours", "fire", FIRE_PALETTES), range("memory", "Remembers, minutes", 10, 1, 120),
+            color("background", "Unused keys", [6, 6, 14]),
+        ],
+        needs_keys: true, needs_audio: false, needs_system: false,
     },
 ];
 
@@ -217,6 +241,8 @@ pub struct Inputs {
     /// Overall loudness 0..1.
     pub level: f32,
     pub beat: bool,
+    /// Processor load, memory in use and the processor's temperature on a 35–95 °C scale, 0..1 each.
+    pub system: [f32; 3],
 }
 
 pub type Rgbf = [f32; 3];
@@ -236,7 +262,7 @@ pub fn hsv(h: f32, s: f32, v: f32) -> Rgbf {
     }
 }
 
-fn mix(a: Rgbf, b: Rgbf, w: f32) -> Rgbf {
+pub fn mix(a: Rgbf, b: Rgbf, w: f32) -> Rgbf {
     [a[0] * (1.0 - w) + b[0] * w, a[1] * (1.0 - w) + b[1] * w, a[2] * (1.0 - w) + b[2] * w]
 }
 
@@ -314,6 +340,9 @@ struct Reactive { b: Base, energy: Vec<f32>, color: Vec<Rgbf>, ripples: Vec<(f32
 struct Fire { b: Base, grid: Vec<f32> }
 struct Spectrum(Base);
 struct Pulse { b: Base, smooth: f32 }
+/// `rows`: the key rows of the number row and of F1–F12, left to right.
+struct Monitor { b: Base, rows: [Vec<usize>; 2], shown: f32 }
+struct Heatmap { b: Base, heat: Vec<f32> }
 
 impl Effect for Wave {
     fn info(&self) -> &'static EffectInfo {
@@ -531,11 +560,67 @@ impl Effect for Pulse {
     }
 }
 
+impl Effect for Monitor {
+    fn info(&self) -> &'static EffectInfo {
+        self.b.info
+    }
+    fn render(&mut self, _t: f32, dt: f32, inp: &Inputs) -> Vec<Rgbf> {
+        let reading = match self.b.v.text("source") {
+            "memory" => inp.system[1],
+            "temperature" => inp.system[2],
+            _ => inp.system[0],
+        };
+        // Glide towards each reading, so the bar moves smoothly between samples
+        self.shown += (reading.clamp(0.0, 1.0) - self.shown) * (1.0 - (-dt / 0.35).exp());
+        let (low, high, background) = (self.b.v.rgb("low"), self.b.v.rgb("high"), self.b.v.rgb("background"));
+        let n = self.b.pos.len();
+        let row = match self.b.v.text("row") {
+            "all" => return vec![mix(low, high, self.shown); n],
+            "function" => &self.rows[1],
+            _ => &self.rows[0],
+        };
+        let mut out = vec![background; n];
+        let m = row.len().max(1) as f32;
+        for (j, &i) in row.iter().enumerate() {
+            // The last lit key shows how far into it the reading goes
+            let fill = ((self.shown - j as f32 / m) * m).clamp(0.0, 1.0);
+            out[i] = mix(background, mix(low, high, (j as f32 + 0.5) / m), fill);
+        }
+        out
+    }
+}
+
+impl Effect for Heatmap {
+    fn info(&self) -> &'static EffectInfo {
+        self.b.info
+    }
+    fn render(&mut self, _t: f32, dt: f32, inp: &Inputs) -> Vec<Rgbf> {
+        let half_life = self.b.v.int("memory") * 60.0;
+        let decay = 0.5f32.powf(dt / half_life.max(1.0));
+        for h in &mut self.heat {
+            *h *= decay;
+        }
+        for &i in &inp.presses {
+            if let Some(h) = self.heat.get_mut(i) {
+                *h += 1.0;
+            }
+        }
+        // Relative to the most used key, and a few presses before anything glows at full
+        let top = self.heat.iter().copied().fold(4.0f32, f32::max);
+        let (name, background) = (self.b.v.text("palette"), self.b.v.rgb("background"));
+        self.heat.iter().map(|h| {
+            let v = (h / top).sqrt();
+            mix(background, palette(name, 0.25 + 0.75 * v, None), v)
+        }).collect()
+    }
+}
+
 /// The effect with `id` (the rainbow wave when unknown), set up with stored `values`.
 pub fn create(id: &str, pos: &[[f32; 2]], values: &Map<String, Value>) -> Box<dyn Effect> {
     let info = info(id).unwrap_or(&EFFECTS[0]);
     let b = Base { info, pos: pos.to_vec(), v: Values::new(info, values) };
     let n = pos.len();
+    let keys = crate::layout::keys(); // in the same order as the positions
     match info.id {
         "drift" => Box::new(Drift(b)),
         "breath" => Box::new(Breath(b)),
@@ -551,6 +636,17 @@ pub fn create(id: &str, pos: &[[f32; 2]], values: &Map<String, Value>) -> Box<dy
         }
         "spectrum" => Box::new(Spectrum(b)),
         "pulse" => Box::new(Pulse { b, smooth: 0.0 }),
+        "monitor" => {
+            let row = |codes: &[u8]| {
+                let mut row: Vec<usize> = (0..n).filter(|&i| keys.get(i).is_some_and(|k| codes.contains(&k.code))).collect();
+                row.sort_by(|a, b| pos[*a][0].total_cmp(&pos[*b][0]));
+                row
+            };
+            let numbers: Vec<u8> = (0x1E..=0x27).chain([0x2D, 0x2E]).collect();
+            let function: Vec<u8> = (0x3A..=0x45).collect();
+            Box::new(Monitor { b, rows: [row(&numbers), row(&function)], shown: 0.0 })
+        }
+        "heatmap" => Box::new(Heatmap { b, heat: vec![0.0; n] }),
         _ => Box::new(Wave(b)),
     }
 }
@@ -580,7 +676,7 @@ mod tests {
         let (leds, pos) = positions();
         for e in &EFFECTS {
             let mut fx = create(e.id, pos, &Map::new());
-            let inp = Inputs { presses: vec![0, 10], bands: vec![0.5; 16], level: 0.7, beat: true };
+            let inp = Inputs { presses: vec![0, 10], bands: vec![0.5; 16], level: 0.7, beat: true, system: [0.5, 0.3, 0.9] };
             for frame in 0..30 {
                 let colors = fx.render(frame as f32 / 30.0, 1.0 / 30.0, &inp);
                 assert_eq!(colors.len(), pos.len(), "{}", e.id);
@@ -589,6 +685,36 @@ mod tests {
             let table = to_bytes(&fx.render(1.0, 0.03, &inp), leds, 1.0);
             assert_eq!(table[4], 1, "{}: Esc has LED index 1", e.id);
         }
+    }
+
+    #[test]
+    fn system_monitor_fills_its_row() {
+        let (_, pos) = positions();
+        let mut fx = create("monitor", pos, &Map::new());
+        let half = Inputs { system: [0.5, 0.0, 0.0], ..Inputs::default() };
+        let mut colors = vec![];
+        for _ in 0..200 {
+            colors = fx.render(0.0, 0.05, &half); // long enough to settle on the reading
+        }
+        let row: Vec<usize> = (0..pos.len()).filter(|&i| (0x1E..=0x27).contains(&crate::layout::keys()[i].code)).collect();
+        assert_eq!(row.len(), 10, "1 to 0");
+        let lit = |i: usize| colors[i].iter().sum::<f32>() > 0.3;
+        let key = |code: u8| (0..pos.len()).find(|&i| crate::layout::keys()[i].code == code).unwrap();
+        assert!(lit(key(0x1E)) && lit(key(0x22)), "1 and 5 are lit at 50 %");
+        assert!(!lit(key(0x25)) && !lit(key(0x2E)), "8 and = are not");
+        assert!(!lit(key(0x29)), "Esc keeps the background");
+    }
+
+    #[test]
+    fn heat_map_glows_where_keys_are_pressed() {
+        let (_, pos) = positions();
+        let mut fx = create("heatmap", pos, &Map::new());
+        let mut colors = vec![];
+        for _ in 0..8 {
+            colors = fx.render(0.0, 0.1, &Inputs { presses: vec![5], ..Inputs::default() });
+        }
+        let glow = |i: usize| colors[i].iter().sum::<f32>();
+        assert!(glow(5) > 1.0 && glow(6) < 0.2, "{} {}", glow(5), glow(6));
     }
 
     #[test]

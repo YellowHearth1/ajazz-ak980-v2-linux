@@ -14,12 +14,13 @@ use std::time::{Duration, Instant, SystemTime};
 use log::warn;
 
 use crate::audio::AudioMeter;
-use crate::config::{self, Config, LightSource, Profile};
+use crate::config::{self, Config, LightSource, Profile, Settings};
 use crate::device::WiredKeyboard;
-use crate::effects::{Effect, Inputs, Rgbf, create, to_bytes};
+use crate::effects::{Effect, Inputs, Rgbf, create, mix, to_bytes};
 use crate::keyinput::KeyListener;
 use crate::layout::{by_code, positions};
 use crate::profiles::apply_lighting;
+use crate::sysinfo::{NotificationWatch, SystemReadings, lock_keys};
 
 /// Pause between the reports of one real-time frame; closer reports make the keyboard stall.
 const REALTIME_GAP: Duration = Duration::from_millis(2);
@@ -158,9 +159,80 @@ impl Device {
     }
 }
 
+/// What is drawn over any PC effect, as the settings ask: Caps Lock, Num Lock and Scroll Lock in
+/// their own colour while they are on, and a short double flash when a desktop notification comes.
+/// Both come from the PC, so they work with every effect and in the app's preview alike.
+pub struct Overlays {
+    /// Rows (into the key arrays) of Caps Lock, Num Lock and Scroll Lock, where the layout has them.
+    lock_rows: [Option<usize>; 3],
+    locks: [bool; 3],
+    locks_at: Option<Instant>,
+    watch: Option<NotificationWatch>,
+    seen: u32,
+    flash_from: Option<Instant>,
+}
+
+/// How long a notification flash lasts.
+const FLASH: Duration = Duration::from_millis(900);
+
+impl Default for Overlays {
+    fn default() -> Self {
+        let row = |code: u8| by_code(code).and_then(|k| positions().0.iter().position(|&i| i == k.index));
+        Self { lock_rows: [row(0x39), row(0x53), row(0x47)], locks: [false; 3], locks_at: None, watch: None, seen: 0,
+               flash_from: None }
+    }
+}
+
+impl Overlays {
+    pub fn apply(&mut self, colors: &mut [Rgbf], settings: &Settings) {
+        if settings.overlay_locks {
+            if self.locks_at.is_none_or(|t| t.elapsed() >= Duration::from_millis(150)) {
+                self.locks_at = Some(Instant::now());
+                self.locks = lock_keys();
+            }
+            let c = settings.overlay_lock_color.map(|v| v as f32 / 255.0);
+            for (row, on) in self.lock_rows.iter().zip(self.locks) {
+                if let Some(color) = row.filter(|_| on).and_then(|r| colors.get_mut(r)) {
+                    *color = c;
+                }
+            }
+        }
+        if settings.overlay_notifications {
+            if self.watch.is_none() {
+                self.watch = NotificationWatch::start();
+                self.seen = self.watch.as_ref().map_or(0, |w| w.count());
+            }
+            if let Some(count) = self.watch.as_ref().map(|w| w.count()).filter(|c| *c != self.seen) {
+                self.seen = count;
+                self.flash_from = Some(Instant::now());
+            }
+            if let Some(a) = self.flash_from.map(|t| flash(t.elapsed())) {
+                let c = settings.overlay_notify_color.map(|v| v as f32 / 255.0);
+                for color in colors.iter_mut() {
+                    *color = mix(*color, c, a);
+                }
+            }
+        } else {
+            self.watch = None; // stops dbus-monitor
+        }
+    }
+}
+
+/// How strongly the notification colour covers the keys `elapsed` into a flash: two pulses, the
+/// second weaker, then nothing.
+fn flash(elapsed: Duration) -> f32 {
+    let t = elapsed.as_secs_f32() / FLASH.as_secs_f32();
+    if t >= 1.0 {
+        return 0.0;
+    }
+    (1.0 - t) * (0.5 - 0.5 * (t * std::f32::consts::TAU * 2.0).cos())
+}
+
 struct Sources {
     keys: Option<KeyListener>,
     audio: AudioMeter,
+    system: SystemReadings,
+    overlays: Overlays,
 }
 
 impl Sources {
@@ -193,7 +265,8 @@ fn run(shared: Arc<Shared>, sink: Option<FrameSink>, path: PathBuf, drive: bool)
     let mut cfg = Config::load_from(&path);
     let mut seen: Option<SystemTime> = config::mtime(&path);
     let mut device = Device { drive, kb: None, next_open: Instant::now() };
-    let mut inputs = Sources { keys: None, audio: AudioMeter::new() };
+    let mut inputs = Sources { keys: None, audio: AudioMeter::new(), system: SystemReadings::default(),
+                             overlays: Overlays::default() };
     let mut effect: Option<Box<dyn Effect>> = None;
     let mut effect_key = String::new();
     let mut streaming = false;
@@ -242,7 +315,11 @@ fn run(shared: Arc<Shared>, sink: Option<FrameSink>, path: PathBuf, drive: bool)
         if e.info().needs_audio && inputs.audio.running() {
             (inp.bands, inp.level, inp.beat) = inputs.audio.snapshot();
         }
-        let colors = e.render(now.duration_since(t0).as_secs_f32(), dt, &inp);
+        if e.info().needs_system {
+            inp.system = inputs.system.get();
+        }
+        let mut colors = e.render(now.duration_since(t0).as_secs_f32(), dt, &inp);
+        inputs.overlays.apply(&mut colors, &cfg.settings);
         let brightness = profile.host_brightness.min(100) as f32 / 100.0;
 
         if let Some(sink) = &sink {
@@ -285,6 +362,31 @@ mod tests {
             "profiles": [{"name": "P", "light_source": source, "host_effect": "wave", "host_brightness": 50}],
         });
         std::fs::write(path, json.to_string()).unwrap();
+    }
+
+    #[test]
+    fn notification_flash_pulses_and_ends() {
+        assert_eq!(flash(Duration::ZERO), 0.0);
+        let first = flash(FLASH / 4);
+        let second = flash(FLASH * 3 / 4);
+        assert!(first > 0.6 && second > 0.1 && second < first, "{first} {second}");
+        assert_eq!(flash(FLASH), 0.0);
+    }
+
+    #[test]
+    fn lock_overlay_only_when_asked() {
+        let n = positions().1.len();
+        let mut colors = vec![[0.0; 3]; n];
+        let mut o = Overlays::default();
+        assert!(o.lock_rows[0].is_some() && o.lock_rows[1].is_some(), "Caps Lock and Num Lock are on the AK980 V2");
+        o.apply(&mut colors, &Settings::default());
+        assert!(colors.iter().all(|c| *c == [0.0; 3]), "off by default");
+        o.locks = [true, false, false];
+        o.locks_at = Some(Instant::now()); // as if just read from the lights
+        let settings = Settings { overlay_locks: true, overlay_lock_color: [255, 0, 0], ..Settings::default() };
+        o.apply(&mut colors, &settings);
+        assert_eq!(colors[o.lock_rows[0].unwrap()], [1.0, 0.0, 0.0]);
+        assert_eq!(colors[o.lock_rows[1].unwrap()], [0.0; 3]);
     }
 
     #[test]

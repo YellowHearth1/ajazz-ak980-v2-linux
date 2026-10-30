@@ -141,6 +141,11 @@ pub struct Rule {
     pub profile: String,
 }
 
+/// A launcher command that switches to the next profile, in the order of the list.
+pub const PROFILE_NEXT: &str = "profile:next";
+/// The start of a launcher command that switches to the profile named after it.
+pub const PROFILE_USE: &str = "profile:use:";
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Launcher {
     /// F13..F24
@@ -177,6 +182,12 @@ pub struct Settings {
     pub colorway: String,
     /// Desktop notifications from the agent (battery, lost 2.4 GHz link).
     pub notifications: bool,
+    /// Over any PC effect: Caps Lock and Num Lock light up while they are on.
+    pub overlay_locks: bool,
+    pub overlay_lock_color: [u8; 3],
+    /// Over any PC effect: the keyboard flashes when a desktop notification comes.
+    pub overlay_notifications: bool,
+    pub overlay_notify_color: [u8; 3],
 }
 
 impl Default for Settings {
@@ -199,6 +210,10 @@ impl Default for Settings {
             accent: "mauve".into(),
             colorway: "auto".into(),
             notifications: true,
+            overlay_locks: false,
+            overlay_lock_color: [255, 255, 255],
+            overlay_notifications: false,
+            overlay_notify_color: [80, 160, 255],
         }
     }
 }

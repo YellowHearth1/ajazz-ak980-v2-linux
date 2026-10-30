@@ -25,7 +25,8 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use log::{debug, info, warn};
 
-use crate::config::{self, Config, Settings};
+use crate::battery;
+use crate::config::{self, Config, PROFILE_NEXT, PROFILE_USE, Settings};
 use crate::device::{DONGLE_PID, Dongle, VENDOR_ID, WiredKeyboard};
 use crate::engine::LightingEngine;
 use crate::hid::enumerate;
@@ -421,6 +422,31 @@ pub fn run_launcher(command: &str) {
 // ------------------------------------------------------------ the agent
 
 static STOP: AtomicBool = AtomicBool::new(false);
+/// Set when a profile key is pressed, so the agent acts on it at once instead of after its pause.
+static WAKE: AtomicBool = AtomicBool::new(false);
+
+/// The profile a profile key asks for: the next one in the list, or one by name.
+pub fn requested_profile(cfg: &Config, request: &str) -> Option<String> {
+    if request == PROFILE_NEXT {
+        let names: Vec<&str> = cfg.profiles.iter().map(|p| p.name.as_str()).collect();
+        let at = names.iter().position(|n| *n == cfg.active).unwrap_or(0);
+        return names.get((at + 1) % names.len().max(1)).map(|n| n.to_string());
+    }
+    let name = request.strip_prefix(PROFILE_USE)?;
+    cfg.get(name).map(|p| p.name.clone())
+}
+
+/// Waits like `wait`, but a profile key ends the pause.
+fn wait_or_wake(d: Duration) {
+    let end = Instant::now() + d;
+    while !STOP.load(Ordering::Relaxed) && !WAKE.swap(false, Ordering::Relaxed) {
+        let left = end.saturating_duration_since(Instant::now());
+        if left.is_zero() {
+            break;
+        }
+        std::thread::sleep(left.min(Duration::from_millis(50)));
+    }
+}
 
 extern "C" fn request_stop(_: libc::c_int) {
     STOP.store(true, Ordering::SeqCst);
@@ -448,6 +474,8 @@ pub struct Agent {
     keys: Option<KeyListener>,
     poller: Option<DonglePoller>,
     launchers: Arc<Mutex<HashMap<u8, String>>>,
+    /// Profile keys pressed since the agent last looked.
+    profile_requests: Arc<Mutex<Vec<String>>>,
     /// The profile the running programs asked for last time.
     wanted: Option<String>,
     /// The profile switched to because a program runs.
@@ -468,6 +496,7 @@ impl Agent {
             keys: None,
             poller: None,
             launchers: Arc::default(),
+            profile_requests: Arc::default(),
             wanted: None,
             for_program: None,
             before_program: None,
@@ -541,11 +570,17 @@ impl Agent {
         let any = !table.is_empty();
         *self.launchers.lock().unwrap() = table;
         if any && self.keys.is_none() {
-            let launchers = self.launchers.clone();
+            let (launchers, requests) = (self.launchers.clone(), self.profile_requests.clone());
             self.keys = Some(KeyListener::start(move |usage, pressed| {
                 let command = if pressed { launchers.lock().unwrap().get(&usage).cloned() } else { None };
-                if let Some(command) = command {
-                    run_launcher(&command);
+                match command {
+                    // Profiles are switched by the agent's own loop, which owns the configuration
+                    Some(c) if c.starts_with("profile:") => {
+                        requests.lock().unwrap().push(c);
+                        WAKE.store(true, Ordering::Relaxed);
+                    }
+                    Some(c) => run_launcher(&c),
+                    None => {}
                 }
             }));
         } else if !any {
@@ -656,6 +691,12 @@ impl Agent {
             if now_present == Some("2.4g") && !once && !self.system && Instant::now() >= next_link_check {
                 next_link_check = Instant::now() + Duration::from_secs(LINK_CHECK_SECONDS);
                 let answer = ask_battery();
+                if let LinkAnswer::Level(level) = answer {
+                    let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
+                    if let Err(e) = battery::record(&paths::battery_log(), now, level) {
+                        warn!("cannot keep the battery record: {e}");
+                    }
+                }
                 let state = record_link(link_state.as_deref(), &answer, &paths::link_log());
                 let notice = link_notice(link_state.as_deref(), &state, &answer, &mut self.battery_alert);
                 if let Some(n) = notice.filter(|_| settings.notifications) {
@@ -691,6 +732,19 @@ impl Agent {
                 break if now_present.is_none() { 1 } else { 0 };
             }
 
+            let requests = std::mem::take(&mut *self.profile_requests.lock().unwrap());
+            if !requests.is_empty()
+                && let Some(mut c) = cfg.take()
+            {
+                for request in requests {
+                    if let Some(name) = requested_profile(&c, &request) {
+                        info!("profile key: {name}");
+                        self.switch_to(&mut c, &name);
+                    }
+                }
+                cfg = Some(c);
+            }
+
             if Instant::now() >= next_switch
                 && let Some(mut c) = cfg.take()
             {
@@ -698,7 +752,7 @@ impl Agent {
                 self.auto_switch(&mut c, None);
                 cfg = Some(c);
             }
-            wait(&STOP, Duration::from_secs(POLL_SECONDS));
+            wait_or_wake(Duration::from_secs(POLL_SECONDS));
         };
 
         if let Some(mut engine) = self.engine.take() {
@@ -777,6 +831,22 @@ mod tests {
         let _ = fs::remove_dir_all(&d);
         fs::create_dir_all(&d).unwrap();
         d
+    }
+
+    #[test]
+    fn profile_keys_pick_the_next_or_a_named_profile() {
+        let dir = temp_dir("profile-keys");
+        let mut c = Config::load_from(&dir.join("c.json"));
+        let main = c.active.clone();
+        c.add(Profile::named("Game"));
+        c.add(Profile::named("Work"));
+        assert_eq!(requested_profile(&c, PROFILE_NEXT).as_deref(), Some("Game"));
+        c.active = "Work".into();
+        assert_eq!(requested_profile(&c, PROFILE_NEXT), Some(main), "after the last comes the first");
+        assert_eq!(requested_profile(&c, &format!("{PROFILE_USE}Game")).as_deref(), Some("Game"));
+        assert_eq!(requested_profile(&c, &format!("{PROFILE_USE}Gone")), None);
+        assert_eq!(requested_profile(&c, "steam"), None);
+        let _ = fs::remove_dir_all(dir);
     }
 
     #[test]
