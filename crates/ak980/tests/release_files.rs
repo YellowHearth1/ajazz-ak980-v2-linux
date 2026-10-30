@@ -28,6 +28,12 @@ fn appstream_and_changelog_start_with_this_version() {
 }
 
 #[test]
+fn design_notes_describe_this_version() {
+    let design = repo_file("docs/DESIGN.md");
+    assert!(design.lines().any(|l| l == format!("version: {VERSION}")), "docs/DESIGN.md describes another version");
+}
+
+#[test]
 fn package_recipe_builds_this_version() {
     let pkgbuild = repo_file("packaging/arch/PKGBUILD");
     assert!(pkgbuild.lines().any(|l| l == format!("pkgver={VERSION}")), "PKGBUILD builds another version");
