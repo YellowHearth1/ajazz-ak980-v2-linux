@@ -263,6 +263,7 @@ impl Sources {
 fn run(shared: Arc<Shared>, sink: Option<FrameSink>, path: PathBuf, drive: bool) {
     let (leds, pos) = positions();
     let mut cfg = Config::load_from(&path);
+    crate::device::set_white_balance(cfg.settings.white_balance);
     let mut seen: Option<SystemTime> = config::mtime(&path);
     let mut device = Device { drive, kb: None, next_open: Instant::now() };
     let mut inputs = Sources { keys: None, audio: AudioMeter::new(), system: SystemReadings::default(),
@@ -282,6 +283,10 @@ fn run(shared: Arc<Shared>, sink: Option<FrameSink>, path: PathBuf, drive: bool)
             if m != seen {
                 seen = m;
                 cfg = Config::load_from(&path);
+                if crate::device::white_balance() != cfg.settings.white_balance {
+                    crate::device::set_white_balance(cfg.settings.white_balance);
+                    device.drop_device(); // opened again with the new balance
+                }
             }
         }
         let profile = shared.preview.lock().unwrap().clone().unwrap_or_else(|| cfg.profile().clone());

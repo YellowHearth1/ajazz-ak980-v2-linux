@@ -184,6 +184,9 @@ pub struct Settings {
     /// How the keyboard is drawn: "auto" (the colourway that suits the theme), "graphite" or
     /// "lavender".
     pub colorway: String,
+    /// Red, green and blue gains in percent for every colour sent to the keyboard: its red LEDs
+    /// are stronger, so lowering red evens a white that looks pink.
+    pub white_balance: [u8; 3],
     /// Which AK980 the window draws: "screen" (the V2 with its screen and knob) or "keys" (Insert,
     /// Print Screen, Scroll Lock and Pause in their place). The drawing only.
     pub keyboard_model: String,
@@ -220,6 +223,7 @@ impl Default for Settings {
             accent: "mauve".into(),
             colorway: "auto".into(),
             keyboard_model: "screen".into(),
+            white_balance: [100, 100, 100],
             notifications: true,
             overlay_locks: false,
             overlay_lock_color: [255, 255, 255],

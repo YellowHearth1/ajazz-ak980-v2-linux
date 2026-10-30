@@ -148,7 +148,9 @@ fn build() -> Command {
                 .arg(Arg::new("brightness").long("brightness").value_parser(value_parser!(u8).range(0..=5)))
                 .arg(Arg::new("speed").long("speed").value_parser(value_parser!(u8).range(0..=5)))
                 .arg(Arg::new("direction").long("direction").value_parser(value_parser!(u8).range(0..=3))
-                    .help(numbered(&DIRECTIONS, 0))),
+                    .help(numbered(&DIRECTIONS, 0)))
+                .arg(Arg::new("balance").long("balance").value_name("R,G,B").value_parser(parse_balance)
+                    .help(tr("white balance in percent, e.g. 85,100,95 when white looks pink; 100,100,100 is none"))),
         )
         .subcommand(
             sub("fx", tr("PC lighting effect, e.g. ak980 fx spectrum palette=fire"))
@@ -557,7 +559,17 @@ fn cmd_effects() {
     }
 }
 
+/// `R,G,B`, each 40–100.
+fn parse_balance(s: &str) -> std::result::Result<[u8; 3], String> {
+    let parts: Vec<u8> = s.split(',').filter_map(|v| v.trim().parse().ok()).filter(|v| (40..=100).contains(v)).collect();
+    <[u8; 3]>::try_from(parts).map_err(|_| tr("write it as R,G,B, each from 40 to 100, for example 85,100,95"))
+}
+
 fn cmd_light(m: &ArgMatches, cfg: &mut Config) -> Result<()> {
+    if let Some(gains) = m.get_one::<[u8; 3]>("balance") {
+        cfg.settings.white_balance = *gains;
+        device::set_white_balance(*gains);
+    }
     let p = cfg.profile_mut();
     let s = &mut p.lighting;
     if let Some(mode) = m.get_one::<String>("mode") {
@@ -1039,6 +1051,7 @@ fn run(m: &ArgMatches) -> Result<ExitCode> {
     // SAFETY: restoring the default action of one signal before any thread starts
     unsafe { libc::signal(libc::SIGPIPE, libc::SIG_DFL) };
     let mut cfg = Config::load();
+    device::set_white_balance(cfg.settings.white_balance);
     match name {
         "gui" => open_gui(sub.get_flag("tray"))?,
         "status" => cmd_status(sub, &cfg)?,

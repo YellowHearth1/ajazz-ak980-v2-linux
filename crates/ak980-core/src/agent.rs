@@ -676,6 +676,9 @@ impl Agent {
         }
         let config_path = paths::config_path();
         let mut cfg = (!self.system).then(Config::load);
+        if let Some(c) = &cfg {
+            crate::device::set_white_balance(c.settings.white_balance);
+        }
         let mut seen = cfg.as_ref().and_then(|_| config::mtime(&config_path));
         if !once {
             self.poller = Some(DonglePoller::start(!self.system));
@@ -709,6 +712,7 @@ impl Agent {
                 if m != seen {
                     seen = m;
                     let fresh = Config::load();
+                    crate::device::set_white_balance(fresh.settings.white_balance);
                     self.update_launchers(&fresh);
                     cfg = Some(fresh);
                 }

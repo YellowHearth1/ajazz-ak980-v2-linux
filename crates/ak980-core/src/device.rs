@@ -13,6 +13,7 @@
 //! ID 0 + command + byte sum in the last byte). The reply repeats the first three command bytes.
 
 use std::collections::BTreeMap;
+use std::sync::atomic::{AtomicU8, Ordering};
 use std::thread::sleep;
 use std::time::{Duration, Instant};
 
@@ -75,12 +76,36 @@ impl Link {
     }
 }
 
+// ------------------------------------------------------------ white balance
+
+/// The white balance every keyboard opened from now on uses, red, green and blue in percent.
+static BALANCE: [AtomicU8; 3] = [AtomicU8::new(100), AtomicU8::new(100), AtomicU8::new(100)];
+
+/// Sets the white balance (`settings.white_balance`) for the keyboards this process opens next.
+pub fn set_white_balance(gains: [u8; 3]) {
+    for (b, g) in BALANCE.iter().zip(gains) {
+        b.store(g.clamp(1, 100), Ordering::Relaxed);
+    }
+}
+
+pub fn white_balance() -> [u8; 3] {
+    [0, 1, 2].map(|i| BALANCE[i].load(Ordering::Relaxed))
+}
+
+/// `c` with each channel scaled by its gain: the keyboard's LEDs are not equally strong, so an even
+/// white (255, 255, 255) can look pink; lowering the strong channels evens it out.
+pub fn balanced(c: [u8; 3], gains: [u8; 3]) -> [u8; 3] {
+    [0, 1, 2].map(|i| ((c[i] as u32 * gains[i].min(100) as u32 + 50) / 100) as u8)
+}
+
 /// The keyboard on a USB cable: every setting is available.
 pub struct WiredKeyboard {
     cmd: Box<dyn Hid>,
     lcd: Option<Box<dyn Hid>>,
     /// Pause before each configuration command, as in the vendor driver (`<cmd_delaytime value="35"/>`).
     pub delay: Duration,
+    /// Gains applied to every colour sent (effect colour, per-key colours, real-time frames).
+    pub balance: [u8; 3],
 }
 
 impl WiredKeyboard {
@@ -107,12 +132,14 @@ impl WiredKeyboard {
             Some(info) => Some(Box::new(HidDevice::open(info)?)),
             None => None,
         };
-        Ok(Self::with_transport(cmd, lcd))
+        let mut kb = Self::with_transport(cmd, lcd);
+        kb.balance = white_balance();
+        Ok(kb)
     }
 
-    /// For tests: any [`Hid`] implementation.
+    /// For tests: any [`Hid`] implementation. Colours go out as they are (no white balance).
     pub fn with_transport(cmd: Box<dyn Hid>, lcd: Option<Box<dyn Hid>>) -> Self {
-        Self { cmd, lcd, delay: Duration::from_millis(35) }
+        Self { cmd, lcd, delay: Duration::from_millis(35), balance: [100; 3] }
     }
 
     pub fn command_port(&mut self) -> &mut dyn Hid {
@@ -246,6 +273,8 @@ impl WiredKeyboard {
     // ------------------------------------------------------------ lighting
 
     pub fn set_lighting(&mut self, s: &LightSettings) -> Result<()> {
+        let mut s = s.clone();
+        [s.r, s.g, s.b] = balanced([s.r, s.g, s.b], self.balance);
         self.locked(|kb| {
             kb.begin()?;
             kb.command(OP_LIGHT, 0, 1, &[])?;
@@ -267,7 +296,7 @@ impl WiredKeyboard {
             let i = idx as usize * 4;
             if i + 3 < table.len() - 2 {
                 table[i] = idx;
-                table[i + 1..i + 4].copy_from_slice(rgb);
+                table[i + 1..i + 4].copy_from_slice(&balanced(*rgb, self.balance));
             }
         }
         let n = table.len();
@@ -294,6 +323,13 @@ impl WiredKeyboard {
     /// `table` holds `[index R G B]` × 128. The keyboard shows the frame until the next one, or
     /// until a configuration command replaces it. Reports closer than ~1 ms make it stall the bus.
     pub fn send_realtime(&mut self, table: &[u8; REALTIME_LEDS * 4], gap: Duration) -> Result<()> {
+        let mut table = *table;
+        if self.balance != [100; 3] {
+            for entry in table.chunks_mut(4) {
+                let [r, g, b] = balanced([entry[1], entry[2], entry[3]], self.balance);
+                entry[1..4].copy_from_slice(&[r, g, b]);
+            }
+        }
         self.locked(|kb| {
             let mut head = [0u8; 65];
             head[1] = PREFIX;
@@ -694,6 +730,22 @@ pub(crate) mod tests {
         let sent = cmd.commands();
         assert_eq!(sent.iter().map(|p| p[1]).collect::<Vec<_>>(), [0x18, 0x17, 0x01, 0x02]);
         assert_eq!((sent[2][4], sent[2][6], sent[2][8]), (1, 3, 4));
+    }
+
+    #[test]
+    fn white_balance_scales_every_colour_sent() {
+        assert_eq!(balanced([255, 255, 255], [80, 100, 90]), [204, 255, 230]);
+        assert_eq!(balanced([10, 0, 255], [100, 100, 100]), [10, 0, 255]);
+        let (mut kb, cmd, _) = keyboard();
+        kb.balance = [80, 100, 90];
+        let s = LightSettings { mode: 1, r: 255, g: 255, b: 255, brightness: 5, speed: 0, direction: 0, rainbow: false };
+        kb.set_lighting(&s).unwrap();
+        assert_eq!(&cmd.commands()[2][1..4], &[204, 255, 230]);
+        cmd.features.lock().unwrap().clear();
+        let mut table = [0u8; 512];
+        table[4..8].copy_from_slice(&[1, 255, 255, 255]);
+        kb.send_realtime(&table, Duration::ZERO).unwrap();
+        assert_eq!(&cmd.features.lock().unwrap()[1][5..9], &[1, 204, 255, 230]);
     }
 
     #[test]

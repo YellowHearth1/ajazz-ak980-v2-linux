@@ -140,6 +140,7 @@ fn poll_status(read_battery: bool) -> Status {
 impl App {
     pub fn boot() -> (Self, Task<Message>) {
         let cfg = Config::load();
+        device::set_white_balance(cfg.settings.white_balance);
         let system_dark = true;
         let s = &cfg.settings;
         let theme = theme::activate(theme::roles_for(&s.theme, &s.accent, &s.colorway, &s.keyboard_model, system_dark));
@@ -276,6 +277,7 @@ impl App {
                     self.config_mtime = status.config_mtime;
                     let active = std::mem::take(&mut self.cfg.active);
                     self.cfg = Config::load();
+                    device::set_white_balance(self.cfg.settings.white_balance);
                     if self.cfg.active != active {
                         self.profiles.rename.clear(); // a name typed for the profile that was active
                     }
