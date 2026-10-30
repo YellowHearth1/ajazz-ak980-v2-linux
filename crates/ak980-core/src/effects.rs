@@ -23,20 +23,39 @@ pub struct Param {
     /// English; translate with `tr`.
     pub label: &'static str,
     pub kind: ParamKind,
+    /// Shown only while another setting has this value (`id`, value; "true" for a toggle).
+    pub when: Option<(&'static str, &'static str)>,
+}
+
+impl Param {
+    const fn when(self, id: &'static str, value: &'static str) -> Self {
+        Self { when: Some((id, value)), ..self }
+    }
+
+    /// Whether this setting applies with `values`; the window hides the others.
+    pub fn shown(&self, values: &Map<String, Value>, info: &EffectInfo) -> bool {
+        let Some((id, wanted)) = self.when else { return true };
+        let Some(other) = info.params.iter().find(|p| p.id == id) else { return true };
+        match value(other, values) {
+            ParamValue::Text(t) => t == wanted,
+            ParamValue::Bool(b) => b.to_string() == wanted,
+            _ => true,
+        }
+    }
 }
 
 const fn color(id: &'static str, label: &'static str, c: [u8; 3]) -> Param {
-    Param { id, label, kind: ParamKind::Color(c) }
+    Param { id, label, kind: ParamKind::Color(c), when: None }
 }
 const fn range(id: &'static str, label: &'static str, default: i32, lo: i32, hi: i32) -> Param {
-    Param { id, label, kind: ParamKind::Range { default, lo, hi } }
+    Param { id, label, kind: ParamKind::Range { default, lo, hi }, when: None }
 }
 const fn choice(id: &'static str, label: &'static str, default: &'static str,
                 choices: &'static [(&'static str, &'static str)]) -> Param {
-    Param { id, label, kind: ParamKind::Choice { default, choices } }
+    Param { id, label, kind: ParamKind::Choice { default, choices }, when: None }
 }
 const fn toggle(id: &'static str, label: &'static str, default: bool) -> Param {
-    Param { id, label, kind: ParamKind::Toggle(default) }
+    Param { id, label, kind: ParamKind::Toggle(default), when: None }
 }
 
 pub const DIRECTION_CHOICES: &[(&str, &str)] = &[
@@ -68,7 +87,10 @@ pub const EFFECTS: [EffectInfo; 10] = [
     EffectInfo {
         id: "wave", name: "Rainbow wave", description: "A rainbow that flows across the keys.",
         params: &[
-            choice("direction", "Direction", "right", DIRECTION_CHOICES), range("speed", "Speed", 40, 0, 100),
+            choice("direction", "Direction", "right", DIRECTION_CHOICES),
+            range("centre_x", "Centre, from the left", 50, 0, 100).when("direction", "circle"),
+            range("centre_y", "Centre, from the top", 50, 0, 100).when("direction", "circle"),
+            range("speed", "Speed", 40, 0, 100),
             range("size", "Wave length", 100, 20, 300), range("saturation", "Saturation", 100, 0, 100),
         ],
         needs_keys: false, needs_audio: false, needs_system: false,
@@ -77,7 +99,10 @@ pub const EFFECTS: [EffectInfo; 10] = [
         id: "drift", name: "Colour drift", description: "Two colours slowly flowing into each other.",
         params: &[
             color("a", "First colour", [255, 143, 31]), color("b", "Second colour", [40, 90, 255]),
-            choice("direction", "Direction", "diagonal", DIRECTION_CHOICES), range("speed", "Speed", 25, 0, 100),
+            choice("direction", "Direction", "diagonal", DIRECTION_CHOICES),
+            range("centre_x", "Centre, from the left", 50, 0, 100).when("direction", "circle"),
+            range("centre_y", "Centre, from the top", 50, 0, 100).when("direction", "circle"),
+            range("speed", "Speed", 25, 0, 100),
             range("size", "Wave length", 120, 20, 300),
         ],
         needs_keys: false, needs_audio: false, needs_system: false,
@@ -132,6 +157,8 @@ pub const EFFECTS: [EffectInfo; 10] = [
         params: &[
             color("a", "Quiet colour", [40, 10, 120]), color("b", "Loud colour", [255, 143, 31]),
             range("sensitivity", "Sensitivity", 55, 0, 100), toggle("from_centre", "Spread from the centre", true),
+            range("centre_x", "Centre, from the left", 50, 0, 100).when("from_centre", "true"),
+            range("centre_y", "Centre, from the top", 55, 0, 100).when("from_centre", "true"),
         ],
         needs_keys: false, needs_audio: true, needs_system: false,
     },
@@ -229,6 +256,11 @@ impl Values {
     fn flag(&self, id: &str) -> bool {
         matches!(self.0.get(id), Some(ParamValue::Bool(true)))
     }
+    /// The point waves start from, as a share of the keyboard's width and height.
+    fn centre(&self) -> [f32; 2] {
+        let share = |id: &str, default: f32| if self.0.contains_key(id) { self.int(id) / 100.0 } else { default };
+        [share("centre_x", 0.5), share("centre_y", 0.5)]
+    }
 }
 
 /// What the effects react to.
@@ -296,14 +328,16 @@ fn hz(speed: f32, lo: f32, hi: f32) -> f32 {
     lo + (hi - lo) * (speed.clamp(0.0, 100.0) / 100.0).powf(1.5)
 }
 
-fn projection(direction: &str, p: [f32; 2]) -> f32 {
+/// Where a key is along the direction of a wave; "circle" measures from `centre`. The keyboard is
+/// about 2.8 times as wide as it is high, hence the factor on y.
+fn projection(direction: &str, p: [f32; 2], centre: [f32; 2]) -> f32 {
     let [x, y] = p;
     match direction {
         "left" => 1.0 - x,
         "down" => y * 0.36,
         "up" => (1.0 - y) * 0.36,
         "diagonal" => (x + y * 0.36) / 1.36,
-        "circle" => (x - 0.5).hypot((y - 0.5) * 0.36) * 2.0,
+        "circle" => (x - centre[0]).hypot((y - centre[1]) * 0.36) * 2.0,
         _ => x,
     }
 }
@@ -353,7 +387,8 @@ impl Effect for Wave {
         let cycles = 100.0 / v.int("size").max(20.0);
         let speed = hz(v.int("speed"), 0.03, 1.4);
         let sat = v.int("saturation") / 100.0;
-        self.0.pos.iter().map(|p| hsv(projection(v.text("direction"), *p) * cycles - t * speed, sat, 1.0)).collect()
+        let centre = v.centre();
+        self.0.pos.iter().map(|p| hsv(projection(v.text("direction"), *p, centre) * cycles - t * speed, sat, 1.0)).collect()
     }
 }
 
@@ -367,7 +402,7 @@ impl Effect for Drift {
         let speed = hz(v.int("speed"), 0.03, 1.4);
         let (a, b) = (v.rgb("a"), v.rgb("b"));
         self.0.pos.iter().map(|p| {
-            let w = 0.5 + 0.5 * (TAU * (projection(v.text("direction"), *p) * cycles - t * speed)).cos();
+            let w = 0.5 + 0.5 * (TAU * (projection(v.text("direction"), *p, v.centre()) * cycles - t * speed)).cos();
             mix(a, b, w)
         }).collect()
     }
@@ -547,10 +582,10 @@ impl Effect for Pulse {
         let lvl = self.smooth;
         let (a, b) = (v.rgb("a"), v.rgb("b"));
         let base = scale(a, 0.25 + 0.5 * lvl);
-        let centre = v.flag("from_centre");
+        let (spread, [cx, cy]) = (v.flag("from_centre"), v.centre());
         self.b.pos.iter().map(|[x, y]| {
-            let m = if centre {
-                let d = (x - 0.5).hypot((y - 0.55) * 0.36) * 2.1;
+            let m = if spread {
+                let d = (x - cx).hypot((y - cy) * 0.36) * 2.1;
                 ((lvl * 1.15 - d) * 3.0 + 1.0).clamp(0.0, 1.0)
             } else {
                 lvl
@@ -728,8 +763,28 @@ mod tests {
         m.insert("speed".into(), Value::from(500));
         m.insert("direction".into(), Value::from("sideways"));
         let wave = &EFFECTS[0];
-        assert_eq!(value(&wave.params[1], &m), ParamValue::Int(100));
-        assert_eq!(value(&wave.params[0], &m), ParamValue::Text("right".into()));
+        let param = |id: &str| wave.params.iter().find(|p| p.id == id).unwrap();
+        assert_eq!(value(param("speed"), &m), ParamValue::Int(100));
+        assert_eq!(value(param("direction"), &m), ParamValue::Text("right".into()));
+    }
+
+    #[test]
+    fn waves_spread_from_the_centre_they_are_given() {
+        let wave = &EFFECTS[0];
+        let mut m = Map::new();
+        m.insert("direction".into(), Value::from("circle"));
+        assert!(param_shown(wave, "centre_x", &m), "the centre goes with From the centre");
+        m.insert("centre_x".into(), Value::from(10));
+        m.insert("centre_y".into(), Value::from(90));
+        let v = Values::new(wave, &m);
+        assert_eq!(v.centre(), [0.1, 0.9]);
+        assert_eq!(projection("circle", [0.1, 0.9], v.centre()), 0.0, "the centre is where the wave starts");
+        m.insert("direction".into(), Value::from("right"));
+        assert!(!param_shown(wave, "centre_x", &m), "other directions have no centre");
+    }
+
+    fn param_shown(info: &EffectInfo, id: &str, values: &Map<String, Value>) -> bool {
+        info.params.iter().find(|p| p.id == id).unwrap().shown(values, info)
     }
 
     #[test]

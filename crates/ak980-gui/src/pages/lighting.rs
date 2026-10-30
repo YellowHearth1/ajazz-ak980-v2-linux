@@ -158,9 +158,18 @@ pub fn update(app: &mut App, msg: Msg) -> Task<Message> {
             Task::none()
         }
         Msg::Key(KeyEvent::Pressed(led) | KeyEvent::Painted(led)) => {
-            let (leds, _) = layout::positions();
+            let (leds, pos) = layout::positions();
             if let Some(row) = leds.iter().position(|l| *l == led) {
                 app.lighting.presses.push(row);
+                // An effect that spreads from a centre takes the clicked key as its centre
+                if let Some(centre) = movable_centre(app) {
+                    let p = app.cfg.profile_mut();
+                    let values = p.host_values.entry(centre.to_string()).or_default();
+                    for (axis, v) in ["centre_x", "centre_y"].iter().zip(pos[row]) {
+                        values.insert(axis.to_string(), serde_json::Value::from((v * 100.0).round() as i64));
+                    }
+                    app.save();
+                }
             }
             if let Some(engine) = &app.lighting.engine {
                 engine.inject_press(led);
@@ -197,6 +206,15 @@ pub fn keep_engine(app: &mut App) -> Task<Message> {
         _ => {}
     }
     Task::none()
+}
+
+/// The PC effect whose waves start from a centre that can be moved, while it is shown.
+fn movable_centre(app: &App) -> Option<&'static str> {
+    let p = app.cfg.profile();
+    let info = effects::info(&p.host_effect)?;
+    let values = p.host_values.get(info.id).cloned().unwrap_or_default();
+    let centre = info.params.iter().find(|prm| prm.id == "centre_x")?;
+    (p.light_source == LightSource::Host && !info.needs_keys && centre.shown(&values, info)).then_some(info.id)
 }
 
 pub fn animating(app: &App) -> bool {
@@ -446,6 +464,9 @@ fn pc_effect(app: &App) -> Element<'_, Message> {
         pick_list(list, current, |c| wrap(Msg::Effect(c))).style(theme::pick).menu_style(theme::menu).width(220),
     )];
     for prm in info.params {
+        if !prm.shown(&values, info) {
+            continue;
+        }
         let id = prm.id;
         let control: Element<'_, Message> = match (prm.kind, effects::value(prm, &values)) {
             (ParamKind::Color(_), ParamValue::Color(c)) => {
@@ -481,6 +502,8 @@ fn pc_effect(app: &App) -> Element<'_, Message> {
     let mut col = column![section(tr("PC effects"), card(rows)), caption(who)].spacing(8);
     if info.needs_keys {
         col = col.push(caption(tr("Click keys on the drawing to try it.")));
+    } else if movable_centre(app).is_some() {
+        col = col.push(caption(tr("Click a key on the drawing to move the centre there.")));
     }
     col.push(overlays(app)).into()
 }
