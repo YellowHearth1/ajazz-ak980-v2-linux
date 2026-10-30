@@ -349,6 +349,10 @@ impl App {
     }
 
     fn number_draft(&mut self, id: &str, value: &str) -> Task<Message> {
+        if id == "frame-delay"
+            && let Ok(ms) = value.trim().parse::<u32>() {
+                return pages::screen::set_frame_delay(self, ms);
+            }
         if let Some(rest) = id.strip_prefix("delay:")
             && let (Ok(i), Ok(ms)) = (rest.parse::<usize>(), value.trim().parse::<u16>()) {
                 return pages::macros::set_delay(self, i, ms);

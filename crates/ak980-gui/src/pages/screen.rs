@@ -28,6 +28,8 @@ pub struct State {
     source: Option<Arc<Source>>,
     pub options: RenderOptions,
     frames: Vec<(image::Handle, u32)>,
+    /// The source frame each shown frame comes from, which frame deletions and delays refer to.
+    indices: Vec<usize>,
     pub available: usize,
     index: usize,
     next_at: Option<Instant>,
@@ -47,7 +49,11 @@ pub enum Msg {
     Open(bool),
     Picked(Option<PathBuf>),
     Loaded(PathBuf, Result<Arc<Source>, String>),
-    Rendered(Vec<(Vec<u8>, u32)>, usize),
+    Rendered(Vec<Frame>, Vec<usize>, usize),
+    /// A frame picked on the strip: it is shown, paused, to be edited.
+    Frame(usize),
+    DeleteFrame,
+    RestoreFrames,
     Fit(Fit),
     FlipH(bool),
     FlipV(bool),
@@ -73,6 +79,9 @@ pub enum Msg {
     PickHistory(PathBuf),
 }
 
+/// A frame as the panel shows it, RGBA, and its delay in ms.
+pub type Frame = (Vec<u8>, u32);
+
 fn wrap(m: Msg) -> Message {
     Message::Screen(m)
 }
@@ -89,27 +98,35 @@ fn load(app: &mut App, path: PathBuf) -> Task<Message> {
     })
 }
 
-/// The frames as the panel shows them (RGBA), and how many frames the options select in all.
-fn preview(src: &Source, o: &RenderOptions) -> (Vec<(Vec<u8>, u32)>, usize) {
-    let frames = src.render(o, LCD_MAX_FRAMES);
-    let shown = frames
+/// The frames as the panel shows them (RGBA), their source frames, and how many frames the
+/// options select in all.
+fn preview(src: &Source, o: &RenderOptions) -> (Vec<Frame>, Vec<usize>, usize) {
+    let picked = src.select(o, LCD_MAX_FRAMES);
+    let shown = picked
         .iter()
-        .map(|(f, d)| {
-            let rgb = lcd::preview_565(f, o.dither);
+        .map(|(i, d)| {
+            let rgb = lcd::preview_565(&src.render_frame(*i, o), o.dither);
             let rgba: Vec<u8> = rgb.pixels().flat_map(|p| [p.0[0], p.0[1], p.0[2], 255]).collect();
             (rgba, *d)
         })
         .collect::<Vec<_>>();
-    (shown, src.available(o))
+    (shown, picked.into_iter().map(|(i, _)| i).collect(), src.available(o))
+}
+
+/// A delay typed for the frame shown, in ms.
+pub fn set_frame_delay(app: &mut App, ms: u32) -> Task<Message> {
+    let Some(&i) = app.screen.indices.get(app.screen.index) else { return Task::none() };
+    app.screen.options.delays.insert(i, ms.clamp(lcd::MIN_DELAY, lcd::MAX_DELAY));
+    render(app)
 }
 
 /// Shows `src` at once, without a background task (for the screenshots).
 #[cfg(test)]
 pub fn show_now(app: &mut App, src: Source, path: PathBuf) {
-    let (frames, available) = preview(&src, &app.screen.options);
+    let (frames, indices, available) = preview(&src, &app.screen.options);
     app.screen.source = Some(Arc::new(src));
     app.screen.path = Some(path);
-    let _ = update(app, Msg::Rendered(frames, available));
+    let _ = update(app, Msg::Rendered(frames, indices, available));
 }
 
 fn render(app: &mut App) -> Task<Message> {
@@ -123,8 +140,8 @@ fn render(app: &mut App) -> Task<Message> {
     Task::perform(
         blocking(move || preview(&src, &o)),
         |r| {
-            let (frames, available) = r.unwrap_or_default();
-            wrap(Msg::Rendered(frames, available))
+            let (frames, indices, available) = r.unwrap_or_default();
+            wrap(Msg::Rendered(frames, indices, available))
         },
     )
 }
@@ -166,8 +183,9 @@ pub fn update(app: &mut App, msg: Msg) -> Task<Message> {
                 }
             }
         }
-        Msg::Rendered(frames, available) => {
+        Msg::Rendered(frames, indices, available) => {
             s.rendering = false;
+            s.indices = indices;
             s.frames = frames
                 .into_iter()
                 .map(|(rgba, d)| (image::Handle::from_rgba(LCD_WIDTH as u32, LCD_HEIGHT as u32, rgba), d))
@@ -179,6 +197,22 @@ pub fn update(app: &mut App, msg: Msg) -> Task<Message> {
             }
             return Task::none();
         }
+        Msg::Frame(i) => {
+            s.index = i.min(s.frames.len().saturating_sub(1));
+            s.paused = true;
+            app.drafts.remove("frame-delay");
+            return Task::none();
+        }
+        Msg::DeleteFrame => {
+            // The last frame stays: an animation needs one
+            match s.indices.get(s.index) {
+                Some(&i) if s.indices.len() > 1 => {
+                    o.deleted.insert(i);
+                }
+                _ => return Task::none(),
+            }
+        }
+        Msg::RestoreFrames => o.deleted.clear(),
         Msg::Fit(f) => o.fit = f,
         Msg::FlipH(v) => o.flip_h = v,
         Msg::FlipV(v) => o.flip_v = v,
@@ -412,12 +446,51 @@ pub fn view(app: &App) -> Element<'_, Message> {
     };
     column![
         top,
+        strip(app),
         upload,
         section(tr("Picture"), card(picture)),
         section(tr("Timing"), card(timing)),
         section(tr("Caption"), card(caption_rows)),
     ]
     .spacing(20)
+    .into()
+}
+
+/// The frames side by side with their delays, like a film strip, and what can be done to the one
+/// picked: its own delay, deleting it, or bringing deleted frames back.
+fn strip(app: &App) -> Element<'_, Message> {
+    let s = &app.screen;
+    if s.frames.len() < 2 {
+        return column![].into();
+    }
+    let mut frames = row![].spacing(6);
+    for (n, (handle, delay)) in s.frames.iter().enumerate() {
+        let thumb = column![
+            image(handle.clone()).width(96).height(54),
+            caption(format!("{} · {delay}{}", n + 1, tr(" ms"))),
+        ]
+        .spacing(2);
+        frames = frames.push(button(thumb).padding(4).style(theme::list_item(n == s.index)).on_press(wrap(Msg::Frame(n))));
+    }
+    let delay = s.frames.get(s.index).map(|(_, d)| *d).unwrap_or_default();
+    let value = app.drafts.get("frame-delay").cloned().unwrap_or_else(|| delay.to_string());
+    let edit = row![
+        widgets::body(tr!("Frame {n}", n = s.index + 1)),
+        widgets::hint(text_input("", &value).on_input(|t| Message::Draft("frame-delay".into(), t))
+            .on_submit(Message::DraftSubmit("frame-delay".into())).width(70).padding(4).style(theme::input)
+            .font(fonts::MONO), tr("How long this frame stays on the screen")),
+        caption(tr(" ms").trim().to_string()),
+        widgets::secondary_button(tr("Delete frame"), (s.frames.len() > 1).then(|| wrap(Msg::DeleteFrame))),
+        widgets::secondary_button(tr("Restore deleted frames"), (!s.options.deleted.is_empty()).then(|| wrap(Msg::RestoreFrames))),
+    ]
+    .spacing(10)
+    .align_y(Alignment::Center);
+    column![
+        // Room under the captions for the scroll bar
+        scrollable(container(frames).padding(iced::Padding { bottom: 14.0, ..Default::default() })).direction(scrollable::Direction::Horizontal(scrollable::Scrollbar::default())).style(theme::scroll),
+        edit,
+    ]
+    .spacing(10)
     .into()
 }
 
