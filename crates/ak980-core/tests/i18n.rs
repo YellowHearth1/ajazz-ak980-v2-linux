@@ -50,11 +50,11 @@ fn literal(s: &str) -> Option<String> {
 }
 
 /// (text, is_plural) for literals given to tr!, tr, tr_args and plural (whose singular keys the forms),
-/// and to the `title:`/`detail:` fields of the start-up methods.
+/// and to the `title:`/`detail:` fields of the start-up methods (also set later, `m.detail = `).
 fn translated_literals(code: &str) -> Vec<(String, bool)> {
     let mut found = Vec::new();
     for (pattern, plural) in [("tr!(", false), ("tr(", false), ("tr_args(", false), ("plural(", true),
-                              ("title: ", false), ("detail: ", false)] {
+                              ("title: ", false), ("detail: ", false), (".detail = ", false)] {
         let mut rest = code;
         while let Some(i) = rest.find(pattern) {
             let before = rest[..i].chars().last();

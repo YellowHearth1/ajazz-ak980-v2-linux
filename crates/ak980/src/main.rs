@@ -222,9 +222,9 @@ fn build() -> Command {
                 .subcommand_required(true)
                 .subcommand(Command::new("list"))
                 .subcommand(Command::new("enable").arg(Arg::new("id").required(true)
-                    .help("session | systemd-user | dinit-user | system-<init>")))
+                    .help("session | systemd-user | dinit-user | runit-user | system-<init>")))
                 .subcommand(Command::new("disable").arg(Arg::new("id").required(true)
-                    .help("session | systemd-user | dinit-user | system-<init>"))),
+                    .help("session | systemd-user | dinit-user | runit-user | system-<init>"))),
         )
         .subcommand(
             sub("setup", tr("let your user access the keyboard (installs the udev rule)"))

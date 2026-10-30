@@ -76,7 +76,11 @@ after the program exits; without one, the profile that was on before comes back.
 .TP
 .B service list|enable \fIID\fB|disable \fIID
 Start the agent automatically. IDs: session (XDG autostart), systemd-user, dinit-user,
-system-systemd, system-openrc, system-dinit, system-runit, system-s6.
+runit-user, system-systemd, system-openrc, system-dinit, system-runit, system-s6.
+dinit-user and runit-user use the user's own dinit or runsvdir, whether turnstile or userspawn
+starts it. Every service description is checked (dinit with \fBdinit-check\fR) before it is
+written, and only the init system's own tool enables it. A system service only starts a program
+that only root can change; the system agent gives up root for \fBnobody\fR with the \fBinput\fR group.
 .TP
 .B setup
 Install the udev rule that lets your user access the keyboard (asks for your password).

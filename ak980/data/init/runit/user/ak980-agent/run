@@ -1,0 +1,7 @@
+#!/bin/sh
+# Ajazz AK980 V2 agent, per-user runit service (a runsvdir that turnstile or userspawn starts for
+# the user): screen clock, PC lighting effects, profile switching and launcher keys.
+# turnstile keeps the session's environment (D-Bus address, display) in a directory; notifications
+# and the music effects need it.
+[ -d "$TURNSTILE_ENV_DIR" ] && exec chpst -e "$TURNSTILE_ENV_DIR" @AK980@ agent 2>&1
+exec @AK980@ agent 2>&1

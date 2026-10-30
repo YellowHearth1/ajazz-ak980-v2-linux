@@ -12,6 +12,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
+      - name: dinit, so that the tests check the service descriptions with dinit's own checker
+        run: sudo apt-get update && sudo apt-get install -y dinit || echo "no dinit package here; those tests are skipped"
       - name: Tests
         run: cargo test --workspace --locked
       - name: Clippy

@@ -712,8 +712,38 @@ impl Agent {
     }
 }
 
+/// A system agent that its service manager started as root keeps only what it needs: the `input`
+/// group, which the access rule opens the keyboard to, as the user `nobody`. dinit and s6 start it
+/// as root; systemd, OpenRC and runit already start it without root.
+fn drop_root() -> Result<(), String> {
+    // SAFETY: plain libc calls; the group and user entries are read before anything else runs
+    unsafe {
+        if libc::geteuid() != 0 {
+            return Ok(());
+        }
+        let group = libc::getgrnam(c"input".as_ptr());
+        if group.is_null() {
+            return Err("there is no group called input".into());
+        }
+        let gid = (*group).gr_gid;
+        let user = libc::getpwnam(c"nobody".as_ptr());
+        let uid = if user.is_null() { 65534 } else { (*user).pw_uid };
+        if libc::setgroups(1, &gid) != 0 || libc::setgid(gid) != 0 || libc::setuid(uid) != 0 {
+            return Err(std::io::Error::last_os_error().to_string());
+        }
+        if libc::setuid(0) == 0 {
+            return Err("root could be taken back".into());
+        }
+    }
+    Ok(())
+}
+
 pub fn run(system: bool, interval: Option<u32>, once: bool) -> i32 {
     init_logging();
+    if system && let Err(e) = drop_root() {
+        warn!("the system agent does not run as root, and cannot leave root: {e}");
+        return 1;
+    }
     Agent::new(system, interval).run(once)
 }
 

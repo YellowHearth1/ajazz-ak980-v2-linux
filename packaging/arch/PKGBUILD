@@ -62,6 +62,7 @@ package_ajazz-ak980-v2-linux() {
 package_ajazz-ak980-v2-linux-openrc() {
   pkgdesc="OpenRC service for Ajazz AK980 V2 | Software for Linux (screen clock)"
   depends=(ajazz-ak980-v2-linux openrc)
+  install=ajazz-ak980-v2-linux-openrc.install
   cd "$pkgbase-$pkgver"
   make DESTDIR="$pkgdir" PREFIX=/usr install-openrc
 }
@@ -69,6 +70,7 @@ package_ajazz-ak980-v2-linux-openrc() {
 package_ajazz-ak980-v2-linux-dinit() {
   pkgdesc="dinit services for Ajazz AK980 V2 | Software for Linux (system clock service and user agent)"
   depends=(ajazz-ak980-v2-linux dinit)
+  install=ajazz-ak980-v2-linux-dinit.install
   cd "$pkgbase-$pkgver"
   make DESTDIR="$pkgdir" PREFIX=/usr install-dinit
 }
@@ -76,6 +78,7 @@ package_ajazz-ak980-v2-linux-dinit() {
 package_ajazz-ak980-v2-linux-runit() {
   pkgdesc="runit service for Ajazz AK980 V2 | Software for Linux (screen clock)"
   depends=(ajazz-ak980-v2-linux runit)
+  install=ajazz-ak980-v2-linux-runit.install
   cd "$pkgbase-$pkgver"
   make DESTDIR="$pkgdir" PREFIX=/usr RUNITDIR=/etc/runit/sv install-runit
 }
@@ -83,6 +86,7 @@ package_ajazz-ak980-v2-linux-runit() {
 package_ajazz-ak980-v2-linux-s6() {
   pkgdesc="s6 service for Ajazz AK980 V2 | Software for Linux (screen clock)"
   depends=(ajazz-ak980-v2-linux s6)
+  install=ajazz-ak980-v2-linux-s6.install
   cd "$pkgbase-$pkgver"
   make DESTDIR="$pkgdir" PREFIX=/usr S6DIR=/etc/s6/sv install-s6
 }

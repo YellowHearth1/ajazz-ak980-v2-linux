@@ -28,6 +28,6 @@ complete -c ak980 -n "__fish_seen_subcommand_from fx" -xa "wave drift breath sta
 complete -c ak980 -n "__fish_seen_subcommand_from macro" -xa "list add rm clear upload"
 complete -c ak980 -n "__fish_seen_subcommand_from profile" -xa "list use apply new rm rename export import"
 complete -c ak980 -n "__fish_seen_subcommand_from auto" -xa "on off list add rm default"
-complete -c ak980 -n "__fish_seen_subcommand_from service" -xa "list enable disable session systemd-user dinit-user system-systemd system-openrc system-dinit system-runit system-s6"
+complete -c ak980 -n "__fish_seen_subcommand_from service" -xa "list enable disable session systemd-user dinit-user runit-user system-systemd system-openrc system-dinit system-runit system-s6"
 complete -c ak980 -n "__fish_seen_subcommand_from remap custom" -xa "(ak980 keys 2>/dev/null | awk '{print \$2}')"
 complete -c ak980 -l lang -xa "auto en uk" -d 'Interface language'

@@ -31,20 +31,24 @@ pkgname = ajazz-ak980-v2-linux
 
 pkgname = ajazz-ak980-v2-linux-openrc
 	pkgdesc = OpenRC service for Ajazz AK980 V2 | Software for Linux (screen clock)
+	install = ajazz-ak980-v2-linux-openrc.install
 	depends = ajazz-ak980-v2-linux
 	depends = openrc
 
 pkgname = ajazz-ak980-v2-linux-dinit
 	pkgdesc = dinit services for Ajazz AK980 V2 | Software for Linux (system clock service and user agent)
+	install = ajazz-ak980-v2-linux-dinit.install
 	depends = ajazz-ak980-v2-linux
 	depends = dinit
 
 pkgname = ajazz-ak980-v2-linux-runit
 	pkgdesc = runit service for Ajazz AK980 V2 | Software for Linux (screen clock)
+	install = ajazz-ak980-v2-linux-runit.install
 	depends = ajazz-ak980-v2-linux
 	depends = runit
 
 pkgname = ajazz-ak980-v2-linux-s6
 	pkgdesc = s6 service for Ajazz AK980 V2 | Software for Linux (screen clock)
+	install = ajazz-ak980-v2-linux-s6.install
 	depends = ajazz-ak980-v2-linux
 	depends = s6

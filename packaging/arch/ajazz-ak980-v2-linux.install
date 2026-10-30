@@ -16,3 +16,9 @@ post_install() {
     Or pick one on the app's Device page.
 MSG
 }
+
+# The system-wide clock service is switched off before its unit goes; on other init systems there
+# is no systemctl and nothing to do. Nothing here may fail the transaction.
+pre_remove() {
+  systemctl disable --now ak980d.service >/dev/null 2>&1 || true
+}

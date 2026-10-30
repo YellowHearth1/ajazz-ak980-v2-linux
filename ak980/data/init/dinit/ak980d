@@ -1,6 +1,9 @@
 # Ajazz AK980 V2 clock service, system-wide: keeps the keyboard's screen clock
-# in sync even without a desktop session.
+# in sync even without a desktop session. The agent gives up root for nobody
+# with the input group as soon as it starts.
 #   dinitctl enable ak980d
+# No dependency on another service by name: one that is missing on some system
+# would make this description, and with it boot, fail to load.
 type            = process
 command         = @AK980@ agent --system
 restart         = true

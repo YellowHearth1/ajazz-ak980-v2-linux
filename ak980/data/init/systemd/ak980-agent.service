@@ -5,6 +5,9 @@
 Description=Ajazz AK980 V2 agent (screen clock, lighting effects, profiles)
 Documentation=https://github.com/yellowhearth1/ajazz-ak980-v2-linux
 After=graphical-session.target
+# A program that keeps failing is given up on after five tries in five minutes
+StartLimitIntervalSec=300
+StartLimitBurst=5
 
 [Service]
 Type=simple

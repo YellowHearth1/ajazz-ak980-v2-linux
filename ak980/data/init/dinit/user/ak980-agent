@@ -1,6 +1,9 @@
 # Ajazz AK980 V2 agent, user service: screen clock, PC lighting effects,
-# profile switching and launcher keys.
+# profile switching and launcher keys. For any user instance of dinit, whether
+# turnstile or userspawn starts it:
 #   dinitctl --user enable ak980-agent
+# No dependency on another service by name: one that is missing on some system
+# would make this description, and with it the user's whole boot, fail to load.
 type     = process
 command  = @AK980@ agent
 restart  = true

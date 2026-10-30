@@ -57,7 +57,7 @@ _ak980() {
             if [[ $cword -eq 2 ]]; then
                 COMPREPLY=($(compgen -W "list enable disable" -- "$cur"))
             else
-                COMPREPLY=($(compgen -W "session systemd-user dinit-user system-systemd system-openrc system-dinit
+                COMPREPLY=($(compgen -W "session systemd-user dinit-user runit-user system-systemd system-openrc system-dinit
                     system-runit system-s6" -- "$cur"))
             fi
             ;;

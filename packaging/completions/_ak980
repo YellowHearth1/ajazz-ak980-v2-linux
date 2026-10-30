@@ -52,7 +52,7 @@ _ak980() {
                     if (( CURRENT == 2 )); then
                         _values 'action' list enable disable
                     else
-                        _values 'method' session systemd-user dinit-user system-systemd system-openrc system-dinit system-runit system-s6
+                        _values 'method' session systemd-user dinit-user runit-user system-systemd system-openrc system-dinit system-runit system-s6
                     fi
                     ;;
                 remap|custom) _values 'key' ${(f)"$(ak980 keys 2>/dev/null | awk '{print $2}')"} ;;

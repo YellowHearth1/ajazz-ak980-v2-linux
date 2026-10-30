@@ -4,8 +4,17 @@
 PREFIX="${PREFIX:-$HOME/.local}"
 APPID=io.github.yellowhearth1.AjazzAK980V2
 if [ -x "$PREFIX/bin/ak980" ]; then
-    for m in session systemd-user dinit-user; do "$PREFIX/bin/ak980" service disable "$m" >/dev/null 2>&1; done
+    for m in session systemd-user dinit-user runit-user; do "$PREFIX/bin/ak980" service disable "$m" >/dev/null 2>&1; done
 fi
+# The user service files written for this install, now switched off. Only the ones that start this
+# install's program go; dinit skips a description that is gone, so none of this can hold up a login.
+CONF="${XDG_CONFIG_HOME:-$HOME/.config}"
+for f in "$CONF/dinit.d/ak980-agent" "$CONF/systemd/user/ak980-agent.service"; do
+    if [ -f "$f" ] && grep -q "$PREFIX/bin/ak980" "$f"; then
+        rm -f "$f"
+    fi
+done
+command -v systemctl >/dev/null && systemctl --user daemon-reload >/dev/null 2>&1
 rm -rf "$PREFIX/share/ajazz-ak980-v2-linux"   # the Python install of 0.0.1
 rm -f "$PREFIX/bin/ak980" "$PREFIX/bin/ak980-gui" "$PREFIX/share/applications/$APPID.desktop" \
       "$PREFIX/share/icons/hicolor/scalable/apps/$APPID.svg" "$PREFIX/share/man/man1/ak980.1" \
