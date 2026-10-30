@@ -49,10 +49,11 @@
   </categories>
   <content_rating type="oars-1.1"/>
   <releases>
-    <release version="0.0.3" date="2026-10-30" type="development">
+    <release version="0.0.3" date="2026-10-30">
       <description>
         <p>The clock is set once a week by default, so the animation stays on the screen; reminders; a
-        calibration page for the LEDs' colours; three more AK980 colourways and themes; a colour wheel.</p>
+        page for the LEDs' colours and one for battery calibration; three more AK980 colourways and
+        themes; a colour wheel; packages for pacman with every release.</p>
       </description>
     </release>
     <release version="0.0.2" date="2026-10-30">

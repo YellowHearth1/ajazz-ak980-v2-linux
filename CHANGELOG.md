@@ -1,6 +1,10 @@
 # Changelog
 
-## 0.0.3 — unreleased
+## 0.0.3 — 2026-10-30
+
+> **Written entirely by artificial intelligence.** The author needed software like this for the
+> keyboard but does not have the skills to write it, and asked Claude, a large language model made by
+> Anthropic, to make it. Use it at your own risk and expect mistakes.
 
 - Packages for pacman: every release now carries `.pkg.tar.zst` packages for Arch, Artix and
   derivatives, installed with `sudo pacman -U`, next to the AppImage and the source archive.
