@@ -31,13 +31,15 @@ charging takes, the battery's condition against the first measured charge, and h
 lasts now. \fB\-\-show on\fR shows the estimates in the window and in \fBstatus\fR;
 \fB\-\-reset\fR forgets the measured cycles.
 .TP
-.B time \fR[\fB\-\-slot \fIN\fR]
-Set the screen clock to the system time.
+.B time \fR[\fB\-\-slot \fIN\fR] | \fB\-\-auto \fIhourly|daily|weekly|manual\fR
+Set the screen clock to the system time. Setting it also switches the screen to its clock page.
+With \fB\-\-auto\fR, choose how often the agent sets it on its own (default weekly; a new time
+zone is followed at once).
 .TP
 .B agent \fR[\fB\-\-system\fR] [\fB\-\-once\fR] [\fB\-\-interval \fIMIN\fR]
-Run the background agent. It syncs the clock when the keyboard appears, after sleep, when the
-time or time zone changes, at midnight and periodically; streams PC lighting effects; switches
-profiles for programs; runs launcher keys. With \fB\-\-system\fR it only keeps the clock and reads
+Run the background agent. It sets the clock as \fBtime \-\-auto\fR says and when the time zone
+changes; streams PC lighting effects; switches profiles for programs; runs launcher keys and
+reminders. With \fB\-\-system\fR it only keeps the clock and reads
 \fI/etc/ak980/agent.conf\fR.
 .TP
 .B lcd \fIFILE\fR [\fIoptions\fR]
@@ -51,8 +53,10 @@ Options: \fB\-\-fit\fR fit|fill|stretch, \fB\-\-rotate\fR 0|90|180|270, \fB\-\-z
 .B effects
 List the keyboard's lighting effects and the PC effects.
 .TP
-.B light \fR[\fIEFFECT\fR] [\fB\-\-color \fIRRGGBB\fR] [\fB\-\-rainbow on|off\fR] [\fB\-\-brightness \fI0..5\fR] [\fB\-\-speed \fI0..5\fR] [\fB\-\-direction \fI0..3\fR]
-Set a lighting effect that runs in the keyboard.
+.B light \fR[\fIEFFECT\fR] [\fB\-\-color \fIRRGGBB\fR] [\fB\-\-rainbow on|off\fR] [\fB\-\-brightness \fI0..5\fR] [\fB\-\-speed \fI0..5\fR] [\fB\-\-direction \fI0..3\fR] [\fB\-\-balance \fIR,G,B\fR]
+Set a lighting effect that runs in the keyboard. \fB\-\-balance\fR sets the white balance in percent
+(40 to 100 each) for every colour sent from now on: white looks pink on the AK980 V2, and 78,100,95
+evened it out on one.
 .TP
 .B fx \fR[\fIEFFECT\fR] [\fIsetting\fB=\fIvalue\fR ...] [\fB\-\-brightness \fI0..100\fR] [\fB\-\-list\fR]
 Choose a PC lighting effect (wave, drift, breath, starlight, reactive, fire, spectrum, pulse).
@@ -70,6 +74,13 @@ Key names accepted by \fBremap\fR and \fBcustom\fR.
 .B remap \fIKEY ACTION\fR [\fB\-\-fn\fR] [\fB\-\-dry\fR] | \fB\-\-reset\fR | \fB\-\-list\fR
 Remap a key. ACTION is one of: default, off, key:ctrl+shift+A, mouse:left|right|middle|double|btn4|btn5|wheelup|wheeldown,
 media:play|next|prev|volup|voldown|mute|calc|..., macro:N[:once|repeat:K|toggle|hold|click], multi:A,B,C.
+.TP
+.B remind list|add \fIHH:MM TEXT\fB|rm \fIN\fB|try \fR[\fIEFFECT\fR]
+Reminders: at the time, a notification once and the keys calling for attention. \fBadd\fR takes
+\fB\-\-days\fR \fI1,2,3\fR (Sunday = 0), \fB\-\-minutes\fR, \fB\-\-effect\fR
+flash|pulse|sweep|alternate|rainbow, \fB\-\-color\fR and \fB\-\-screen\fR (the text on the screen
+too; that writes the screen twice, the text and the last animation again). \fBtry\fR plays an effect
+for a few seconds.
 .TP
 .B macro list|add \fINAME SPEC\fB|rm \fIN\fB|clear|upload
 Manage macros. SPEC is text:\fITEXT\fR, combo:\fIctrl+alt+del\fR or steps:down:A,wait:50,up:A,click:left.

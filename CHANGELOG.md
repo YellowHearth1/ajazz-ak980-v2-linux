@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.0.3 — unreleased
+
+- Clock: the agent sets the keyboard's clock once a week by default instead of on every connection
+  and every hour. Every clock packet shows the AK980 V2's clock page, so the animation used to give
+  way to the clock after each start of the computer. Hourly, daily, weekly or only by hand on the
+  *Device* page and with `ak980 time --auto`; a new time zone is followed at once.
+- White balance: red, green and blue gains for every colour sent to the keyboard, because white
+  looks pink on its LEDs; *Show white on the keyboard* to compare, `ak980 light --balance`.
+- Reminders: at a set time a notification, the keys calling for attention (five patterns, any
+  colour, for the minutes asked) and, if asked, the text blinking on the screen with the last
+  animation put back afterwards; `ak980 remind`.
+- Looks: the theme, the keyboard's colourway and model are in the sidebar; three more AK980
+  colourways and themes (Mint, Dusk, Frost); the keyboard can be drawn as the AK980 with Insert,
+  Print Screen, Scroll Lock and Pause instead of the screen and knob. The colourway cannot be
+  detected: the keyboard reports the same name and product number in every colour.
+- Colours are picked on a colour wheel; "Single on" and "Single off" are shown typing instead of
+  with F and J lit; waves spreading from the centre take a centre from sliders or a click.
+- Found on the keyboard: it keeps one animation whatever the upload's slot, and every clock packet
+  shows the clock page (docs/PROTOCOL.md).
+
 ## 0.0.2 — 2026-10-30
 
 > **Written entirely by artificial intelligence.** The author needed software like this for the

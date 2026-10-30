@@ -164,24 +164,43 @@ Start *Ajazz AK980 V2* from the menu, or `ak980` without arguments. The keyboard
 real layout and every page works on it. Deleting a profile or a macro, resetting a layer and
 clearing the colours can be undone until the next change.
 
-The look follows the keyboard: *Graphite* (dark) and *Lavender* (light) are the two colourways of the
-AK980 V2, and Catppuccin comes in its four flavours (Latte, Frappé, Macchiato, Mocha) with any of its
-14 accents. The keyboard on the pages can be drawn in either colourway apart from the theme, and
-*Match the theme* picks the theme that goes with it. Every combination is checked for readable
-contrast (WCAG AA).
+The look follows the keyboard, and the sidebar holds it, so it is at hand on every page. Five
+themes come from colourways of the AK980: *Graphite* (black case, grey caps, yellow Esc, Enter and
+space bar), *Lavender* (white case, lavender modifiers, sky-blue accents), *Mint* (black case, white
+letters, black modifiers, mint accents), *Dusk* (black case, caps fading from black through grey to
+pink) and *Frost* (white case, blue-grey modifiers, dark slate accents and arrows); Catppuccin comes
+in its four flavours (Latte, Frappé, Macchiato, Mocha) with any of its 14 accents. The keyboard can
+be drawn in any colourway apart from the theme, with its screen and knob or as the AK980 with
+Insert, Print Screen, Scroll Lock and Pause in their place (only the drawing changes), and *Match
+the theme* picks the theme that goes with it. Every combination is checked for readable contrast
+(WCAG AA). The colourway is a choice: the keyboard tells the computer only "SONiX AK980 PRO" and the
+same product number in every colour, so there is nothing to detect it from.
+
+Colours are picked on a colour wheel (hue around, saturation outwards), from swatches or as a hex
+code.
 
 | | |
 |---|---|
 | ![Screen](docs/screenshots/en/screen-graphite.png) | **Screen.** Open a GIF, a picture or a folder of numbered frames. Fit, fill or stretch it; adjust brightness, contrast and saturation; change the speed or give every frame the same delay; cut frames or keep every Nth one to fit the 140-frame limit; turn it, zoom into a part and move it, keep sharp pixels for pixel art, change its tone or shift its hues; play it forward, backward or there and back; add a caption, still or running across the screen, with a shadow or an outline. The strip shows every frame with its delay: select one to change its delay or delete it. The preview is the exact 16-bit image the panel will show. Uploading takes about 0.15 s per 4 KiB page. Every upload is kept under *Earlier uploads*, because the keyboard cannot give an animation back. |
-| ![Lighting](docs/screenshots/en/lighting-graphite.png) | **Lighting.** *Keyboard effects* are the 19 effects of the firmware; they stay when the computer is off. *PC effects* are computed here and streamed to the keys; they run while the app or the agent runs. |
+| ![Lighting](docs/screenshots/en/lighting-graphite.png) | **Lighting.** *Keyboard effects* are the 19 effects of the firmware; they stay when the computer is off ("Single on" and "Single off" are shown typing). *PC effects* are computed here and streamed to the keys; they run while the app or the agent runs. Waves that spread from the centre take a centre you move with sliders or by clicking a key. *White balance* evens out the keyboard's LEDs (see below). |
 | ![Colours](docs/screenshots/en/colours-graphite.png) | **Colours.** Paint keys: left button paints (drag across keys), right button picks a key's colour, middle button clears it. Fill, rainbow, gradient, WASD, arrows, F row and numpad in one click. The colours are stored in the keyboard. |
 | ![Keys](docs/screenshots/en/keys-lavender.png) | **Keys.** Click a key, choose what it does on the base layer or while Fn is held: another key or a shortcut, a mouse button or the wheel, a media key, a macro (once, N times, until pressed again, while held), up to three keys at once, a program or a link, another profile, or nothing. *Program or link* sends one of the spare keys F13–F24, which the agent turns into the program, the link or the profile. |
 | ![Macros](docs/screenshots/en/macros-lavender.png) | **Macros.** Record from the keyboard with or without your real pauses, type text, add key presses and mouse clicks, edit every pause. A bar shows how much of the keyboard's macro memory is used. Keys refer to macros by number: after deleting one, write the macros and both key layers again (the app moves the keys of the later macros with them). |
 | ![Profiles](docs/screenshots/en/profiles-lavender.png) | **Profiles.** A profile is everything the keyboard holds plus the PC effect. Switch from the header or here; export and import them as files. *Games and programs* switches a profile while a program runs (`cs2`, `eldenring.exe`, …). |
-| ![Device](docs/screenshots/en/device-graphite.png) | **Device.** Keyboard options, the clock, battery measurements, how the agent starts, access, the 2.4 GHz link record and *Reconnect the receiver*, theme, keyboard colours, language, notifications. |
+| ![Device](docs/screenshots/en/device-graphite.png) | **Device.** Keyboard options, the clock and how often the agent sets it, battery measurements, how the agent starts, access, the 2.4 GHz link record and *Reconnect the receiver*, language, notifications. |
 
-Not in 0.0.2 yet: the tray icon of 0.0.1 (switching profiles from the panel). The agent's
-notifications (a lost 2.4 GHz link, a low battery) need `notify-send`.
+**Reminders** (on the *Screen* page, or `ak980 remind`): at a set time on the days you pick, the
+agent shows a notification once and makes the keys call for attention for as many minutes as you
+like: flashes, a pulse, a band sweeping across, left and right in turn or rainbow flashes, in the
+colour you pick, over any lighting; then the keyboard's own lighting comes back. If you ask, the
+text also blinks on the screen and your last animation goes back afterwards. The keyboard keeps a
+single animation and no known command shows another one without sending it, so that writes the
+screen's memory twice each time (about 5 s for the text, about a minute for a 28-frame animation):
+keep it for the reminders that matter. The same is why there is no envelope on the screen for
+every new message: each one would rewrite the animation twice.
+
+Not there yet: the tray icon of 0.0.1 (switching profiles from the panel). The agent's
+notifications (a lost 2.4 GHz link, a low battery, reminders) need `notify-send`.
 
 ## Command line
 
@@ -189,6 +208,10 @@ notifications (a lost 2.4 GHz link, a low battery) need `notify-send`.
 ak980 status                                 # connection, battery, profile, agent (--json, --waybar)
 ak980 battery --show on                      # what whole cycles taught about the battery
 ak980 time                                   # set the screen clock now
+ak980 time --auto weekly                     # how often the agent sets it: hourly, daily, weekly, manual
+ak980 light --balance 78,100,95              # white balance, when white looks pink
+ak980 remind add 16:30 Stand up --days 1,2,3,4,5 --minutes 3 --effect sweep
+ak980 remind try pulse --color ff7800        # what a reminder looks like on the keys
 ak980 lcd ~/Pictures/cat.gif --fit fill      # upload to the screen (kept in ~/.local/share/ak980/history)
 ak980 lcd cat.gif --preview out.gif          # only see how it will look
 ak980 lcd photo.jpg --text "Hello" --scroll --outline --tone sepia --preview out.gif   # running text
@@ -268,8 +291,18 @@ Placement matters too: a receiver behind the metal case or next to Wi-Fi gear lo
 Put it on a USB extension cable or a front port, and not on the same USB 2.0 hub as an audio
 interface or USB microphone. Tools like `powertop --auto-tune` can suspend the receiver; exclude it.
 
-**The screen jumped to another page after a clock sync.** The vendor app sends a screen page with the
-time; this app sends page 1 like it does. Change it on the *Device* page if your screen uses another.
+**The screen shows the clock instead of my animation after the computer starts.** Setting the clock
+switches the AK980 V2's screen to its clock page, whatever page is sent with it, and the agent used
+to set it every time the keyboard connected and every hour. It now sets it once a week by default
+(and at once when the time zone changes); *Set the clock by itself* on the *Device* page, or
+`ak980 time --auto`, chooses hourly, daily, weekly or only when you ask. The keyboard keeps its own
+time in between. Turn the knob in the screen menu (Fn + press the knob) to get the animation back.
+
+**White looks pink.** The keyboard's red LEDs are stronger than its green and blue ones. *White
+balance* on the *Lighting* page lowers the strong channels for every colour this app sends (the
+effect colour, the key colours and PC effects); *Show white on the keyboard* lets you compare as you
+move the sliders. On one AK980 V2, red 78 %, green 100 % and blue 95 % looked white. The keyboard's
+rainbow effects use their own colours.
 
 ## How it works
 
@@ -284,7 +317,10 @@ Hardware facts worth knowing:
 * the real-time stream is `04 20` + 8 packets of `[index R G B]` + `04 02`; it runs up to ~70 fps,
   but reports sent less than ~1 ms apart make the keyboard stall the USB pipe;
 * the logo light next to the arrows is not addressable from the PC;
-* an animation cannot be read back from the keyboard.
+* the keyboard keeps one animation (the slot sent with an upload does not keep a second one), and an
+  animation cannot be read back from it;
+* every clock packet shows the screen's clock page;
+* white (255, 255, 255) looks pink: the red LEDs are the strongest.
 
 ## Credits
 

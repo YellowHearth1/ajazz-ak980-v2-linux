@@ -19,6 +19,7 @@ _ak980() {
         'keys:key names for remap and custom'
         'remap:remap a key'
         'macro:macros'
+        'remind:reminders'
         'launch:launcher keys F13-F24'
         'profile:profiles'
         'auto:switch profiles when a program starts'

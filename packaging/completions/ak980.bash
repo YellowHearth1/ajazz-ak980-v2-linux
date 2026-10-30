@@ -5,7 +5,7 @@ _ak980() {
     _init_completion || return
 
     local commands="gui status battery list time agent daemon lcd effects modes light fx side custom options keys remap
-                    macro launch profile auto service setup apply link reconnect"
+                    macro remind launch profile auto service setup apply link reconnect"
     if [[ $cword -eq 1 ]]; then
         COMPREPLY=($(compgen -W "$commands --help --version --lang" -- "$cur"))
         return
@@ -69,6 +69,9 @@ _ak980() {
             ;;
         side)
             COMPREPLY=($(compgen -W "flowing red yellow green iceblue blue pink white neon off" -- "$cur"))
+            ;;
+        remind)
+            COMPREPLY=($(compgen -W "list add rm try" -- "$cur"))
             ;;
         launch)
             COMPREPLY=($(compgen -W "F13 F14 F15 F16 F17 F18 F19 F20 F21 F22 F23 F24 --rm --list" -- "$cur"))

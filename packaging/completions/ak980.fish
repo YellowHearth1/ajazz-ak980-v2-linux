@@ -1,5 +1,5 @@
 # fish completion for ak980
-set -l cmds gui status battery list time agent daemon lcd effects modes light fx side custom options keys remap macro launch profile auto service setup apply link reconnect
+set -l cmds gui status battery list time agent daemon lcd effects modes light fx side custom options keys remap macro remind launch profile auto service setup apply link reconnect
 complete -c ak980 -f
 complete -c ak980 -n "not __fish_seen_subcommand_from $cmds" -a gui -d 'Open the app window'
 complete -c ak980 -n "not __fish_seen_subcommand_from $cmds" -a status -d 'Connection, battery, profile, agent'
@@ -15,6 +15,7 @@ complete -c ak980 -n "not __fish_seen_subcommand_from $cmds" -a options -d 'Keyb
 complete -c ak980 -n "not __fish_seen_subcommand_from $cmds" -a keys -d 'Key names'
 complete -c ak980 -n "not __fish_seen_subcommand_from $cmds" -a remap -d 'Remap a key'
 complete -c ak980 -n "not __fish_seen_subcommand_from $cmds" -a macro -d 'Macros'
+complete -c ak980 -n "not __fish_seen_subcommand_from $cmds" -a remind -d 'Reminders'
 complete -c ak980 -n "not __fish_seen_subcommand_from $cmds" -a launch -d 'Launcher keys F13-F24'
 complete -c ak980 -n "not __fish_seen_subcommand_from $cmds" -a profile -d 'Profiles'
 complete -c ak980 -n "not __fish_seen_subcommand_from $cmds" -a auto -d 'Switch profiles for programs'
@@ -32,3 +33,5 @@ complete -c ak980 -n "__fish_seen_subcommand_from auto" -xa "on off list add rm 
 complete -c ak980 -n "__fish_seen_subcommand_from service" -xa "list enable disable session systemd-user dinit-user runit-user system-systemd system-openrc system-dinit system-runit system-s6"
 complete -c ak980 -n "__fish_seen_subcommand_from remap custom" -xa "(ak980 keys 2>/dev/null | awk '{print \$2}')"
 complete -c ak980 -l lang -xa "auto en uk" -d 'Interface language'
+complete -c ak980 -n '__fish_seen_subcommand_from remind' -a 'list add rm try'
+complete -c ak980 -n '__fish_seen_subcommand_from time' -l auto -a 'hourly daily weekly manual'
