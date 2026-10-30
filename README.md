@@ -183,12 +183,13 @@ code.
 |---|---|
 | ![Screen](docs/screenshots/en/screen-graphite.png) | **Screen.** Open a GIF, a picture or a folder of numbered frames. Fit, fill or stretch it; adjust brightness, contrast and saturation; change the speed or give every frame the same delay; cut frames or keep every Nth one to fit the 140-frame limit; turn it, zoom into a part and move it, keep sharp pixels for pixel art, change its tone or shift its hues; play it forward, backward or there and back; add a caption, still or running across the screen, with a shadow or an outline. The strip shows every frame with its delay: select one to change its delay or delete it. The preview is the exact 16-bit image the panel will show. Uploading takes about 0.15 s per 4 KiB page. Every upload is kept under *Earlier uploads*, because the keyboard cannot give an animation back. |
 | ![Lighting](docs/screenshots/en/lighting-graphite.png) | **Lighting.** *Keyboard effects* are the 19 effects of the firmware; they stay when the computer is off ("Single on" and "Single off" are shown typing). *PC effects* are computed here and streamed to the keys; they run while the app or the agent runs. Waves that spread from the centre take a centre you move with sliders or by clicking a key. The keyboard's own keys are listed too: Fn + Z switches the AJAZZ logo light by the arrows off and on. |
-| ![Calibration](docs/screenshots/en/calibration-graphite.png) | **Calibration.** How colours come out on the LEDs: per channel a strength (red is the strongest, so white looks pink) and a curve (how mid levels come out), tuned while every key shows a test colour (white, grey, the primaries, mixes or any colour from the wheel). It applies to every colour the app sends. |
+| ![LED colours](docs/screenshots/en/calibration-graphite.png) | **LED colours.** How colours come out on the LEDs: per channel a strength (red is the strongest, so white looks pink) and a curve (how mid levels come out), tuned while every key shows a test colour (white, grey, the primaries, mixes or any colour from the wheel). It applies to every colour the app sends. |
 | ![Colours](docs/screenshots/en/colours-mint.png) | **Colours.** Paint keys: left button paints (drag across keys), right button picks a key's colour, middle button clears it. Fill, rainbow, gradient, WASD, arrows, F row and numpad in one click. The colours are stored in the keyboard. |
 | ![Keys](docs/screenshots/en/keys-frost.png) | **Keys.** Click a key, choose what it does on the base layer or while Fn is held: another key or a shortcut, a mouse button or the wheel, a media key, a macro (once, N times, until pressed again, while held), up to three keys at once, a program or a link, another profile, or nothing. *Program or link* sends one of the spare keys F13–F24, which the agent turns into the program, the link or the profile. |
 | ![Macros](docs/screenshots/en/macros-lavender.png) | **Macros.** Record from the keyboard with or without your real pauses, type text, add key presses and mouse clicks, edit every pause. A bar shows how much of the keyboard's macro memory is used. Keys refer to macros by number: after deleting one, write the macros and both key layers again (the app moves the keys of the later macros with them). |
 | ![Profiles](docs/screenshots/en/profiles-dusk.png) | **Profiles.** A profile is everything the keyboard holds plus the PC effect. Switch from the header or here; export and import them as files. *Games and programs* switches a profile while a program runs (`cs2`, `eldenring.exe`, …). |
-| ![Device](docs/screenshots/en/device-graphite.png) | **Device.** Keyboard options, the clock and how often the agent sets it, battery measurements, how the agent starts, access, the 2.4 GHz link record and *Reconnect the receiver*, language, notifications. |
+| ![Battery calibration](docs/screenshots/en/battery-frost.png) | **Battery calibration.** The keyboard tells its charge only over 2.4 GHz. The agent reads it every minute and learns from whole cycles how long a charge lasts, how long charging takes (and so the level on the cable, where the keyboard does not tell it) and how worn the battery is, in percent against the first measured charge. The page shows the steps it needs to see once (a full discharge, a full charge) and what it has learnt. The red Fn key while the keyboard charges is drawn by its firmware. |
+| ![Device](docs/screenshots/en/device-graphite.png) | **Device.** Keyboard options, the clock and how often the agent sets it, how the agent starts, access, the 2.4 GHz link record and *Reconnect the receiver*, language, notifications. |
 
 **Reminders** (on the *Screen* page, or `ak980 remind`): at a set time on the days you pick, the
 agent shows a notification once and makes the keys call for attention for as many minutes as you
@@ -300,14 +301,17 @@ to set it every time the keyboard connected and every hour. It now sets it once 
 time in between. Turn the knob in the screen menu (Fn + press the knob) to get the animation back.
 
 **White looks pink.** The keyboard's red LEDs are stronger than its green and blue ones. The
-*Calibration* page lowers the strong channels (and sets each channel's curve) for every colour this
+*LED colours* page lowers the strong channels (and sets each channel's curve) for every colour this
 app sends (the effect colour, the key colours and PC effects); *Show it on the keyboard* lets you
 compare as you move the sliders. On one AK980 V2, red 78 %, green 100 % and blue 95 % looked white.
 The keyboard's rainbow effects use their own colours.
 
 **The AJAZZ logo by the arrows keeps glowing.** No command from the computer reaches it. Press
 Fn + Z: the keyboard switches it off (and on again with the same keys), and the app's lighting
-commands leave it off.
+commands leave it off. The keyboard does not remember it when it is switched off or loses power, so
+the logo lights up again then; press Fn + Z once more.
+
+**The Fn key glows red.** The keyboard is charging; its firmware shows that.
 
 ## How it works
 
