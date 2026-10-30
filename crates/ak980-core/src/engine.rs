@@ -16,7 +16,7 @@ use log::warn;
 use crate::audio::AudioMeter;
 use crate::config::{self, Config, LightSource, Profile, Settings};
 use crate::device::WiredKeyboard;
-use crate::effects::{Effect, Inputs, Rgbf, create, mix, to_bytes};
+use crate::effects::{Effect, Inputs, Rgbf, attention, create, mix, to_bytes};
 use crate::keyinput::KeyListener;
 use crate::layout::{by_code, positions};
 use crate::profiles::apply_lighting;
@@ -36,12 +36,23 @@ pub enum Status {
 /// Receives every frame, already scaled by the profile's brightness, for the on-screen keyboard.
 pub type FrameSink = Arc<dyn Fn(Vec<Rgbf>) + Send + Sync>;
 
+/// A call for attention over whatever the keyboard shows, from a reminder.
+#[derive(Clone, Debug)]
+pub struct Alert {
+    /// One of `effects::ATTENTION`.
+    pub effect: String,
+    pub color: [u8; 3],
+    pub started: Instant,
+    pub until: Instant,
+}
+
 struct Shared {
     stop: AtomicBool,
     status: Mutex<Status>,
     presses: Mutex<Vec<usize>>,
     preview: Mutex<Option<Profile>>,
     audio_error: Mutex<Option<String>>,
+    alert: Mutex<Option<Alert>>,
 }
 
 pub struct LightingEngine {
@@ -60,6 +71,7 @@ impl LightingEngine {
             presses: Mutex::default(),
             preview: Mutex::default(),
             audio_error: Mutex::default(),
+            alert: Mutex::default(),
         };
         Self { drive_device, on_frame, config_path, shared: Arc::new(shared), thread: None }
     }
@@ -97,6 +109,14 @@ impl LightingEngine {
         }
     }
 
+    /// Calls for attention with `effect` in `color` for `duration`, over any lighting; the
+    /// keyboard's own lighting comes back after it.
+    pub fn alert(&self, effect: &str, color: [u8; 3], duration: Duration) {
+        let now = Instant::now();
+        *self.shared.alert.lock().unwrap() =
+            Some(Alert { effect: effect.to_string(), color, started: now, until: now + duration });
+    }
+
     /// The app shows an unsaved profile's effect without touching the config file.
     pub fn set_preview_profile(&self, profile: Option<Profile>) {
         *self.shared.preview.lock().unwrap() = profile;
@@ -107,6 +127,19 @@ impl Drop for LightingEngine {
     fn drop(&mut self) {
         self.stop();
     }
+}
+
+/// Plays a call for attention on `kb` for `duration` (for trying one out); the caller gives the
+/// keyboard its lighting back afterwards.
+pub fn play_attention(kb: &mut WiredKeyboard, effect: &str, color: [u8; 3], duration: Duration) -> crate::Result<()> {
+    let (leds, pos) = positions();
+    let start = Instant::now();
+    while start.elapsed() < duration {
+        let colors = attention(effect, color, start.elapsed().as_secs_f32(), pos);
+        kb.send_realtime(&to_bytes(&colors, leds, 1.0), REALTIME_GAP)?;
+        std::thread::sleep(Duration::from_millis(40));
+    }
+    Ok(())
 }
 
 /// Sleeps up to `d`, waking early when the engine is asked to stop.
@@ -290,6 +323,27 @@ fn run(shared: Arc<Shared>, sink: Option<FrameSink>, path: PathBuf, drive: bool)
             }
         }
         let profile = shared.preview.lock().unwrap().clone().unwrap_or_else(|| cfg.profile().clone());
+        let alert = shared.alert.lock().unwrap().clone();
+        if let Some(a) = alert.as_ref().filter(|a| now < a.until) {
+            let colors = attention(&a.effect, a.color, now.duration_since(a.started).as_secs_f32(), pos);
+            if let Some(sink) = &sink {
+                sink(colors.clone());
+            }
+            if let Some(kb) = device.get() {
+                match kb.send_realtime(&to_bytes(&colors, leds, 1.0), REALTIME_GAP) {
+                    Ok(()) => streaming = true,
+                    Err(e) => {
+                        warn!("cannot call for attention: {e}");
+                        device.drop_device();
+                    }
+                }
+            }
+            set_status(Status::Streaming);
+            wait(&shared.stop, Duration::from_millis(40));
+            continue;
+        } else if alert.is_some() {
+            *shared.alert.lock().unwrap() = None; // over: the profile's lighting or effect comes back below
+        }
         if profile.light_source != LightSource::Host {
             if streaming {
                 device.restore(&profile);

@@ -41,6 +41,7 @@ pub enum Message {
     Macros(pages::macros::Msg),
     Screen(pages::screen::Msg),
     Profiles(pages::profiles::Msg),
+    Reminders(pages::reminders::Msg),
     Device(pages::device::Msg),
 }
 
@@ -97,6 +98,7 @@ pub struct App {
     pub macros: pages::macros::State,
     pub screen: pages::screen::State,
     pub profiles: pages::profiles::State,
+    pub reminders: pages::reminders::State,
     pub device: pages::device::State,
 }
 
@@ -165,6 +167,7 @@ impl App {
             macros: Default::default(),
             screen: Default::default(),
             profiles: Default::default(),
+            reminders: Default::default(),
             device: Default::default(),
         };
         let tasks = Task::batch([
@@ -343,6 +346,7 @@ impl App {
             Message::Macros(m) => pages::macros::update(self, m),
             Message::Screen(m) => pages::screen::update(self, m),
             Message::Profiles(m) => pages::profiles::update(self, m),
+            Message::Reminders(m) => pages::reminders::update(self, m),
             Message::Device(m) => pages::device::update(self, m),
         }
     }

@@ -507,6 +507,7 @@ pub fn view(app: &App) -> Element<'_, Message> {
         section(tr("Picture"), card(picture)),
         section(tr("Timing"), card(timing)),
         section(tr("Caption"), card(caption_rows)),
+        crate::pages::reminders::view(app),
     ]
     .spacing(20)
     .into()

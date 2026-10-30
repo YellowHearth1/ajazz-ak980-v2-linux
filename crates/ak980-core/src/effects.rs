@@ -183,6 +183,36 @@ pub const EFFECTS: [EffectInfo; 10] = [
     },
 ];
 
+/// How the keys call for attention when a reminder comes.
+pub const ATTENTION: [(&str, &str); 5] = [
+    ("flash", "Flash"), ("pulse", "Pulse"), ("sweep", "Sweep across"), ("alternate", "Left and right in turn"),
+    ("rainbow", "Rainbow flash"),
+];
+
+/// The keyboard calling for attention `t` seconds in, for keys at `pos`; everything else waits.
+pub fn attention(effect: &str, color: [u8; 3], t: f32, pos: &[[f32; 2]]) -> Vec<Rgbf> {
+    let c = color.map(|v| v as f32 / 255.0);
+    // Twice a second on and off, the strongest call
+    let blink = if (t * 2.0).fract() < 0.5 { 1.0 } else { 0.0 };
+    pos.iter()
+        .map(|[x, _]| match effect {
+            "pulse" => scale(c, 0.5 - 0.5 * (t * TAU * 1.2).cos()),
+            "sweep" => {
+                // A band running from left to right and back, about a second each way
+                let p = (t / 1.1) % 2.0;
+                let head = if p < 1.0 { p } else { 2.0 - p };
+                scale(c, (1.0 - (x - head).abs() / 0.18).max(0.0))
+            }
+            "alternate" => {
+                let left_lit = ((t * 2.5) as u32).is_multiple_of(2);
+                if (*x < 0.5) == left_lit { c } else { [0.0; 3] }
+            }
+            "rainbow" => scale(hsv(((t * 2.0).floor() * 0.13) % 1.0, 1.0, 1.0), blink),
+            _ => scale(c, blink),
+        })
+        .collect()
+}
+
 pub fn info(id: &str) -> Option<&'static EffectInfo> {
     EFFECTS.iter().find(|e| e.id == id)
 }
@@ -785,6 +815,17 @@ mod tests {
 
     fn param_shown(info: &EffectInfo, id: &str, values: &Map<String, Value>) -> bool {
         info.params.iter().find(|p| p.id == id).unwrap().shown(values, info)
+    }
+
+    #[test]
+    fn attention_lights_and_darkens_the_keys() {
+        let pos = [[0.1, 0.5], [0.9, 0.5]];
+        let lit = |v: Vec<Rgbf>| v.iter().map(|c| c.iter().sum::<f32>() > 0.5).collect::<Vec<_>>();
+        assert_eq!(lit(attention("flash", [255, 0, 0], 0.1, &pos)), [true, true]);
+        assert_eq!(lit(attention("flash", [255, 0, 0], 0.35, &pos)), [false, false], "twice a second: off after a quarter");
+        assert_eq!(lit(attention("alternate", [255, 0, 0], 0.1, &pos)), [true, false]);
+        assert_eq!(lit(attention("alternate", [255, 0, 0], 0.5, &pos)), [false, true]);
+        assert_eq!(lit(attention("sweep", [255, 255, 255], 0.11, &pos)), [true, false], "the band starts on the left");
     }
 
     #[test]

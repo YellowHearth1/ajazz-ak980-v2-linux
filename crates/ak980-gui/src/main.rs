@@ -68,6 +68,10 @@ mod screenshots {
         p.macros.push(Macro::parse("combo:ctrl+shift+esc", Some("Task manager")).unwrap());
         app.cfg.settings.rules.push(Rule { process: "steam".into(), profile: app.cfg.active.clone() });
         app.cfg.settings.launchers.push(Launcher { key: "F13".into(), command: "firefox".into(), label: String::new() });
+        app.cfg.settings.reminders.push(ak980_core::config::Reminder {
+            time: "16:30".into(), days: vec![1, 2, 3, 4, 5], text: "Stand up and stretch".into(), minutes: 3,
+            ..Default::default()
+        });
         app.status.link = Some(Link::Usb);
         app.status.access = Some(true);
         app.status.agent = true;
@@ -183,7 +187,7 @@ mod screenshots {
                 let iced_theme = app.theme();
                 // A picked Device page is drawn whole, so its settings at the bottom show too
                 let tall = page == Page::Device || page == Page::Screen || (page == Page::Lighting && effect.is_some());
-                let size = if pick.is_some() && tall { (width, if page == Page::Screen { 2600.0 } else { 1780.0 }) } else { (width, 820.0) };
+                let size = if pick.is_some() && tall { (width, if page == Page::Screen { 3400.0 } else { 1780.0 }) } else { (width, 820.0) };
                 let mut ui = iced_test::Simulator::with_size(settings, size, app.view());
                 let shot = ui.snapshot(&iced_theme).expect("drawn");
                 let mut stem = format!("{}-{theme}", format!("{page:?}").to_lowercase());

@@ -156,6 +156,50 @@ pub struct Launcher {
     pub label: String,
 }
 
+/// At a set time the agent calls for attention: a desktop notification once, the keyboard's light
+/// for a while, and if asked the text on its screen (then the last animation again).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Reminder {
+    /// "HH:MM", local time.
+    pub time: String,
+    /// The days it comes on, Sunday = 0; none means every day.
+    pub days: Vec<u8>,
+    pub text: String,
+    /// How long the keyboard calls for attention.
+    pub minutes: u32,
+    /// How the keys call for attention: one of `effects::ATTENTION`.
+    pub effect: String,
+    pub color: [u8; 3],
+    /// Also show the text on the screen. That writes the screen's memory twice: the text, and the
+    /// last animation sent from this app again afterwards.
+    pub screen: bool,
+    pub enabled: bool,
+}
+
+impl Default for Reminder {
+    fn default() -> Self {
+        Self { time: "12:00".into(), days: Vec::new(), text: String::new(), minutes: 2, effect: "flash".into(),
+               color: [255, 120, 30], screen: false, enabled: true }
+    }
+}
+
+impl Reminder {
+    /// (hour, minute) of `time`, when it is a valid time of day.
+    pub fn hour_minute(&self) -> Option<(u8, u8)> {
+        let (h, m) = self.time.trim().split_once(':')?;
+        let (h, m) = (h.trim().parse::<u8>().ok()?, m.trim().parse::<u8>().ok()?);
+        (h < 24 && m < 60).then_some((h, m))
+    }
+
+    /// Whether it comes on at `hour:minute` of a day that is `weekday` (Sunday = 0).
+    pub fn due(&self, hour: u8, minute: u8, weekday: u8) -> bool {
+        self.enabled
+            && self.hour_minute() == Some((hour, minute))
+            && (self.days.is_empty() || self.days.contains(&weekday))
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Settings {
@@ -187,6 +231,7 @@ pub struct Settings {
     /// Red, green and blue gains in percent for every colour sent to the keyboard: its red LEDs
     /// are stronger, so lowering red evens a white that looks pink.
     pub white_balance: [u8; 3],
+    pub reminders: Vec<Reminder>,
     /// Which AK980 the window draws: "screen" (the V2 with its screen and knob) or "keys" (Insert,
     /// Print Screen, Scroll Lock and Pause in their place). The drawing only.
     pub keyboard_model: String,
@@ -224,6 +269,7 @@ impl Default for Settings {
             colorway: "auto".into(),
             keyboard_model: "screen".into(),
             white_balance: [100, 100, 100],
+            reminders: Vec::new(),
             notifications: true,
             overlay_locks: false,
             overlay_lock_color: [255, 255, 255],
@@ -597,6 +643,19 @@ mod tests {
         assert_eq!(p.keymap_fn.get(&12), Some(&play(1)), "C moved up, and so did its key");
         assert_eq!(p.keymap_fn.get(&13), Some(&KeyAction::off()));
         assert!(p.remove_macro(5).is_none());
+    }
+
+    #[test]
+    fn reminders_come_at_their_time_on_their_days() {
+        let r = Reminder { time: "09:05".into(), days: vec![1, 2, 3, 4, 5], ..Reminder::default() };
+        assert_eq!(r.hour_minute(), Some((9, 5)));
+        assert!(r.due(9, 5, 1), "Monday");
+        assert!(!r.due(9, 5, 0), "not on Sunday");
+        assert!(!r.due(9, 6, 1));
+        let every_day = Reminder { time: " 23:59 ".into(), ..Reminder::default() };
+        assert!(every_day.due(23, 59, 6));
+        assert!(!Reminder { enabled: false, ..every_day.clone() }.due(23, 59, 6));
+        assert_eq!(Reminder { time: "25:00".into(), ..Reminder::default() }.hour_minute(), None);
     }
 
     #[test]

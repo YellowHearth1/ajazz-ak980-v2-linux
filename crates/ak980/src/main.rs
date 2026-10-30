@@ -211,6 +211,30 @@ fn build() -> Command {
                 .subcommand(Command::new("upload")),
         )
         .subcommand(
+            sub("remind", tr("reminders: a notification, the keys calling for attention, the text on the screen"))
+                .subcommand_required(true)
+                .subcommand(Command::new("list"))
+                .subcommand(
+                    Command::new("add")
+                        .arg(Arg::new("time").required(true).help("HH:MM"))
+                        .arg(Arg::new("text").num_args(0..).trailing_var_arg(true))
+                        .arg(Arg::new("minutes").long("minutes").value_parser(value_parser!(u32).range(1..=60)))
+                        .arg(Arg::new("effect").long("effect")
+                            .value_parser(effects::ATTENTION.map(|(id, _)| id).to_vec()))
+                        .arg(color_arg("color"))
+                        .arg(Arg::new("days").long("days").value_name("1,2,3")
+                            .help(tr("days of the week, Sunday = 0; none: every day")))
+                        .arg(flag("screen", tr("show the text on the screen too (writes the screen twice)"))),
+                )
+                .subcommand(Command::new("rm").arg(Arg::new("index").required(true).value_parser(value_parser!(usize))))
+                .subcommand(
+                    Command::new("try")
+                        .arg(Arg::new("effect").default_value("flash")
+                            .value_parser(effects::ATTENTION.map(|(id, _)| id).to_vec()))
+                        .arg(color_arg("color")),
+                ),
+        )
+        .subcommand(
             sub("launch", tr("launcher keys F13–F24: run a program or open a link"))
                 .after_help(tr!("A command can also switch profiles: {next} for the next one, {named} for one by name.",
                                 next = config::PROFILE_NEXT, named = format!("{}NAME", config::PROFILE_USE)))
@@ -271,6 +295,67 @@ fn build() -> Command {
 }
 
 // ---------------------------------------------------------------- commands
+
+fn cmd_remind(m: &ArgMatches, cfg: &mut Config) -> Result<()> {
+    let (action, sub) = m.subcommand().expect("required");
+    match action {
+        "add" => {
+            let mut r = config::Reminder {
+                time: sub.get_one::<String>("time").expect("required").clone(),
+                text: sub.get_many::<String>("text").into_iter().flatten().cloned().collect::<Vec<_>>().join(" "),
+                screen: sub.get_flag("screen"),
+                ..config::Reminder::default()
+            };
+            let Some((h, mi)) = r.hour_minute() else {
+                return Err(Error::invalid(tr!("Not a time of day: {time} (write it as HH:MM)", time = r.time)));
+            };
+            r.time = format!("{h:02}:{mi:02}");
+            if let Some(n) = sub.get_one::<u32>("minutes") {
+                r.minutes = *n;
+            }
+            if let Some(e) = sub.get_one::<String>("effect") {
+                r.effect.clone_from(e);
+            }
+            if let Some(c) = sub.get_one::<[u8; 3]>("color") {
+                r.color = *c;
+            }
+            if let Some(days) = sub.get_one::<String>("days") {
+                r.days = days.split(',').filter_map(|d| d.trim().parse::<u8>().ok()).filter(|d| *d < 7).collect();
+            }
+            cfg.settings.reminders.push(r);
+            cfg.settings.reminders.sort_by(|a, b| a.time.cmp(&b.time));
+            cfg.save()?;
+            say(tr("Reminder added. The background agent brings it while it runs."));
+        }
+        "rm" => {
+            let i = *sub.get_one::<usize>("index").expect("required");
+            if i >= cfg.settings.reminders.len() {
+                return Err(Error::invalid(format!("{i}")));
+            }
+            cfg.settings.reminders.remove(i);
+            cfg.save()?;
+        }
+        "try" => {
+            let effect = sub.get_one::<String>("effect").expect("default");
+            let color = sub.get_one::<[u8; 3]>("color").copied().unwrap_or(config::Reminder::default().color);
+            let mut kb = WiredKeyboard::open()?;
+            let played = ak980_core::engine::play_attention(&mut kb, effect, color, std::time::Duration::from_secs(6));
+            ak980_core::profiles::apply_lighting(&mut kb, cfg.profile())?;
+            played?;
+        }
+        _ => {
+            for (i, r) in cfg.settings.reminders.iter().enumerate() {
+                let days = if r.days.is_empty() { tr("every day") } else {
+                    r.days.iter().map(|d| d.to_string()).collect::<Vec<_>>().join(",")
+                };
+                let screen = if r.screen { format!(", {}", tr("on the screen too")) } else { String::new() };
+                say(format!("{i:2}  {}  {days}  {} min, {}, {}{screen}{}  {}", r.time, r.minutes, r.effect, html(r.color),
+                            if r.enabled { "" } else { " (off)" }, r.text));
+            }
+        }
+    }
+    Ok(())
+}
 
 fn say(text: impl AsRef<str>) {
     println!("{}", text.as_ref());
@@ -1069,6 +1154,7 @@ fn run(m: &ArgMatches) -> Result<ExitCode> {
         "remap" => cmd_remap(sub, &mut cfg)?,
         "macro" => cmd_macro(sub, &mut cfg)?,
         "launch" => cmd_launch(sub, &mut cfg)?,
+        "remind" => cmd_remind(sub, &mut cfg)?,
         "profile" => cmd_profile(sub, &mut cfg)?,
         "auto" => cmd_auto(sub, &mut cfg)?,
         "service" => cmd_service(sub)?,

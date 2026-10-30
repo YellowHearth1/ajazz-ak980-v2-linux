@@ -8,6 +8,7 @@ pub mod keys;
 pub mod lighting;
 pub mod macros;
 pub mod profiles;
+pub mod reminders;
 pub mod screen;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

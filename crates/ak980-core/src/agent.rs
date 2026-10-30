@@ -26,13 +26,14 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use log::{debug, info, warn};
 
 use crate::battery;
-use crate::config::{self, Config, PROFILE_NEXT, PROFILE_USE, Settings};
-use crate::device::{DONGLE_PID, Dongle, VENDOR_ID, WiredKeyboard};
+use crate::config::{self, Config, PROFILE_NEXT, PROFILE_USE, Reminder, Settings};
+use crate::device::{DONGLE_PID, Dongle, LCD_MAX_FRAMES, VENDOR_ID, WiredKeyboard};
 use crate::engine::LightingEngine;
 use crate::hid::enumerate;
 use crate::i18n::{set_language, tr};
 use crate::keyinput::KeyListener;
 use crate::keymap::key_code;
+use crate::lcd::{self, RenderOptions, Source};
 use crate::paths;
 use crate::profiles::{ALL_PARTS, apply_profile};
 use crate::runtime::InstanceLock;
@@ -482,6 +483,60 @@ pub fn run_launcher(command: &str) {
     }
 }
 
+// ------------------------------------------------------------ reminders
+
+/// While a reminder's text is on the screen: the animation to put back afterwards. A file, so that
+/// an agent stopped in between puts it back when it starts again.
+fn screen_marker() -> std::path::PathBuf {
+    paths::state_dir().join("screen-reminder")
+}
+
+/// Sends frames to the screen. The keyboard keeps one animation, so this replaces it.
+fn upload_frames(frames: &[(image::RgbImage, u32)], slot: u8) -> Result<()> {
+    let blob = lcd::encode_animation(frames, false, &mut |_| {})?;
+    WiredKeyboard::open()?.upload_lcd(&blob, slot, &mut |_| {}, &|| false)?;
+    Ok(())
+}
+
+/// Puts the animation named in the marker back on the screen, if a reminder's text is still there.
+fn restore_screen(slot: u8) {
+    let Ok(path) = fs::read_to_string(screen_marker()) else { return };
+    let path = std::path::PathBuf::from(path.trim());
+    let o = RenderOptions { dither: false, ..RenderOptions::default() };
+    match Source::load(&path, LCD_MAX_FRAMES).and_then(|src| upload_frames(&src.render(&o, LCD_MAX_FRAMES), slot)) {
+        Ok(()) => {
+            let _ = fs::remove_file(screen_marker());
+            info!("the animation is back on the screen ({})", path.display());
+        }
+        Err(e) => warn!("cannot put the animation back on the screen yet: {e}"),
+    }
+}
+
+/// Shows a reminder's text on the screen for `minutes`, then the last animation again. On a thread
+/// of its own: the text takes seconds to send, the animation about a minute.
+fn screen_reminder(text: String, color: [u8; 3], minutes: u32, slot: u8) {
+    let run = move || {
+        let Some(back) = lcd::last_upload() else {
+            warn!("no animation sent from this app to put back, so the reminder's text stays off the screen");
+            return;
+        };
+        if let Err(e) = upload_frames(&lcd::reminder_animation(&text, color), slot) {
+            warn!("cannot show the reminder on the screen: {e}");
+            return;
+        }
+        let marker = screen_marker();
+        let _ = marker.parent().map(fs::create_dir_all);
+        let _ = fs::write(&marker, back.to_string_lossy().as_bytes());
+        wait(&STOP, Duration::from_secs(60 * u64::from(minutes.max(1))));
+        if !STOP.load(Ordering::SeqCst) {
+            restore_screen(slot);
+        }
+    };
+    if let Err(e) = std::thread::Builder::new().name("ak980-reminder".into()).spawn(run) {
+        warn!("cannot start the screen reminder: {e}");
+    }
+}
+
 // ------------------------------------------------------------ the agent
 
 static STOP: AtomicBool = AtomicBool::new(false);
@@ -547,9 +602,25 @@ pub struct Agent {
     before_program: Option<String>,
     /// The last low-battery warning given (20 or 10 %).
     battery_alert: Option<u8>,
+    /// The day each reminder (by time and text) last came, so it comes once.
+    reminded: HashMap<String, (i32, u8, u8)>,
 }
 
 impl Agent {
+    /// A reminder's time has come: a notification once, the keys calling for attention, and the
+    /// text on the screen if it asks for that.
+    fn remind(&self, r: &Reminder, slot: u8) {
+        info!("reminder: {}", r.text);
+        let text = if r.text.trim().is_empty() { tr("It is time") } else { r.text.clone() };
+        notify(&Notice { summary: tr("Reminder"), body: text.clone(), urgent: true });
+        if let Some(engine) = &self.engine {
+            engine.alert(&r.effect, r.color, Duration::from_secs(60 * u64::from(r.minutes.max(1))));
+        }
+        if r.screen {
+            screen_reminder(text, r.color, r.minutes, slot);
+        }
+    }
+
     pub fn new(system: bool, interval_override: Option<u32>) -> Self {
         Self {
             system,
@@ -564,6 +635,7 @@ impl Agent {
             for_program: None,
             before_program: None,
             battery_alert: None,
+            reminded: HashMap::new(),
         }
     }
 
@@ -808,6 +880,24 @@ impl Agent {
                 }
             } else if once {
                 break if now_present.is_none() { 1 } else { 0 };
+            }
+
+            if !once && !self.system {
+                let t = LocalTime::now();
+                let due: Vec<Reminder> = settings.reminders.iter()
+                    .filter(|r| r.due(t.hour, t.minute, t.weekday))
+                    .filter(|r| self.reminded.get(&format!("{}|{}", r.time, r.text)) != Some(&t.date()))
+                    .cloned()
+                    .collect();
+                for r in due {
+                    self.reminded.insert(format!("{}|{}", r.time, r.text), t.date());
+                    self.remind(&r, settings.lcd_slot);
+                }
+                // A reminder's text left on the screen by an agent that stopped: put the animation back
+                if cause == Some(ClockCause::Connected) && now_present == Some("usb") && screen_marker().exists() {
+                    let slot = settings.lcd_slot;
+                    let _ = std::thread::Builder::new().name("ak980-screen".into()).spawn(move || restore_screen(slot));
+                }
             }
 
             let requests = std::mem::take(&mut *self.profile_requests.lock().unwrap());

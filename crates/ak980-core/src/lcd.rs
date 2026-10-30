@@ -651,6 +651,30 @@ pub fn save_history(frames: &[(RgbImage, u32)], source: Option<&Path>) -> Result
 }
 
 /// Saved uploads, newest first (paths to their screen.gif).
+/// A short animation that calls for attention: `text` as large as it fits, blinking (on for half a
+/// second, off for a quarter). Two frames are 32 pages of the screen's memory, about 5 s to send.
+pub fn reminder_animation(text: &str, color: [u8; 3]) -> Vec<(RgbImage, u32)> {
+    let mut o = RenderOptions { text: text.trim().to_string(), text_color: color, text_pos: "center".into(),
+                                text_outline: false, dither: false, ..RenderOptions::default() };
+    let room = W as f32 - 12.0;
+    o.text_size = 44;
+    while o.text_size > 12 && caption_width(&o) > room {
+        o.text_size -= 2;
+    }
+    // Still too long at the smallest size: cut it, the notification carries the whole text
+    while caption_width(&o) > room && o.text.chars().count() > 1 {
+        let keep = o.text.chars().count() - 2;
+        o.text = o.text.chars().take(keep).collect::<String>() + "…";
+    }
+    let dark = RgbaImage::from_pixel(W, H, image::Rgba([0, 0, 0, 255]));
+    vec![(render(&dark, &o), 500), (RgbImage::new(W, H), 250)]
+}
+
+/// The animation sent last from this app, to put back after a reminder: the newest copy kept.
+pub fn last_upload() -> Option<PathBuf> {
+    history_entries().into_iter().next()
+}
+
 pub fn history_entries() -> Vec<PathBuf> {
     let mut names: Vec<PathBuf> = fs::read_dir(paths::history_dir())
         .map(|rd| rd.filter_map(|e| e.ok()).map(|e| e.path()).collect())
@@ -663,6 +687,18 @@ pub fn history_entries() -> Vec<PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_reminder_blinks_its_text_as_large_as_it_fits() {
+        let short = reminder_animation("Tea", [255, 255, 255]);
+        assert_eq!(short.len(), 2, "on and off");
+        assert!(short[0].0.pixels().any(|p| p.0 != [0, 0, 0]), "the text is drawn");
+        assert!(short[1].0.pixels().all(|p| p.0 == [0, 0, 0]), "then darkness");
+        assert!(page_count(2) <= 32);
+        let long = reminder_animation(&"a very long reminder ".repeat(10), [255, 0, 0]);
+        let lit_columns = |img: &RgbImage| (0..W).filter(|x| (0..H).any(|y| img.get_pixel(*x, y).0 != [0, 0, 0])).count();
+        assert!(lit_columns(&long[0].0) < W as usize, "cut to fit the screen");
+    }
 
     #[test]
     fn blob_layout() {
