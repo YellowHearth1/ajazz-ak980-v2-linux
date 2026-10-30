@@ -16,6 +16,8 @@ fn main() -> iced::Result {
         .theme(app::App::theme)
         .subscription(app::App::subscription)
         .default_font(fonts::REGULAR)
+        // The window writes unsaved settings before it goes (App::update, CloseRequested)
+        .exit_on_close_request(false)
         .window(window::Settings {
             size: iced::Size::new(1240.0, 820.0),
             min_size: Some(iced::Size::new(980.0, 640.0)),

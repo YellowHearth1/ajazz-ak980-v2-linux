@@ -118,7 +118,8 @@ pub fn update(app: &mut App, msg: Msg) -> Task<Message> {
                 if on { service::enable(&id)? } else { service::disable(&id)? }
                 Ok(tr("Background agent settings saved"))
             });
-            return Task::batch([task, refresh()]);
+            // Read the switches again once the service manager is done, not while it works
+            return task.chain(refresh());
         }
         Msg::Theme(t) => {
             app.cfg.settings.theme = t.to_string();
@@ -144,7 +145,9 @@ pub fn update(app: &mut App, msg: Msg) -> Task<Message> {
         }
         Msg::Notifications(v) => app.cfg.settings.notifications = v,
         Msg::Open(url) => {
-            let _ = std::process::Command::new("xdg-open").arg(url).spawn();
+            if let Ok(mut child) = std::process::Command::new("xdg-open").arg(url).spawn() {
+                std::thread::spawn(move || child.wait()); // reaped, so no zombie stays behind
+            }
             return Task::none();
         }
     }

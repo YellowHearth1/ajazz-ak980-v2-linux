@@ -70,7 +70,7 @@ pub fn use_profile(app: &mut App, name: String) -> Task<Message> {
         return Task::none();
     }
     app.cfg.active = name;
-    app.profiles.rename = app.cfg.active.clone();
+    app.profiles.rename.clear();
     app.save();
     send_profile(app)
 }
@@ -86,13 +86,20 @@ pub fn update(app: &mut App, msg: Msg) -> Task<Message> {
             let created = app.cfg.add(p);
             app.notify(tr!("Profile created: {name}", name = created), false);
             app.cfg.active = created;
+            app.profiles.rename.clear();
             app.save();
+            // The keyboard shows the active profile, as when switching to one
+            return send_profile(app);
         }
         Msg::Rename(t) => st.rename = t,
         Msg::DoRename => {
-            let (old, new) = (app.cfg.active.clone(), st.rename.clone());
+            let old = app.cfg.active.clone();
+            let new = if st.rename.is_empty() { old.clone() } else { st.rename.clone() };
             match app.cfg.rename(&old, &new) {
-                Ok(_) => app.save(),
+                Ok(_) => {
+                    app.profiles.rename.clear();
+                    app.save();
+                }
                 Err(e) => app.notify(e.to_string(), true),
             }
         }
@@ -100,6 +107,7 @@ pub fn update(app: &mut App, msg: Msg) -> Task<Message> {
             let name = app.cfg.active.clone();
             match app.cfg.remove(&name) {
                 Ok(()) => {
+                    app.profiles.rename.clear();
                     app.save();
                     return send_profile(app);
                 }

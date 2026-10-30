@@ -210,7 +210,10 @@ fn check(r: Output) -> Result<()> {
         let cmd: Vec<String> = r.argv.iter().map(|a| shell_quote(a)).collect();
         message = tr!("Command failed: {cmd}", cmd = cmd.join(" "));
     }
-    if (r.code == 126 || r.code == 127) && r.argv.first().is_some_and(|a| a == "pkexec") {
+    // pkexec answers 126 (dismissed) or 127 (not authorised) with "Error executing command as
+    // another user"; a 127 of the script itself (a command it did not find) keeps its own message
+    let refused = r.stderr.contains("another user") || r.stderr.trim().is_empty();
+    if (r.code == 126 || r.code == 127) && refused && r.argv.first().is_some_and(|a| a == "pkexec") {
         message = tr!("Authorisation was cancelled");
     }
     Err(Error::Io(io::Error::other(message)))
@@ -909,13 +912,10 @@ pub fn preferred_user_method() -> String {
     methods().into_iter().find(|m| m.scope == "user" && m.available).map(|m| m.id).unwrap_or_else(|| "session".into())
 }
 
-/// Enables one way to start the agent; the other per-user ways are turned off, so one agent runs.
+/// Enables one way to start the agent; once it is on, the other per-user ways are turned off, so one
+/// agent runs. They stay as they were when it cannot be turned on, so a failure never leaves the user
+/// without the agent they had.
 pub fn enable(method_id: &str) -> Result<()> {
-    if USER_METHODS.contains(&method_id) {
-        for other in USER_METHODS.iter().filter(|m| **m != method_id) {
-            let _ = disable_user(other);
-        }
-    }
     match method_id {
         "session" => Xdg::real().enable(true),
         "systemd-user" => systemd_user_enable(),
@@ -927,25 +927,42 @@ pub fn enable(method_id: &str) -> Result<()> {
             run_as_root(&system_script(init, true, &writes))
         }
         id => Err(Error::invalid(id.to_string())),
+    }?;
+    if USER_METHODS.contains(&method_id) {
+        let mut stopped = false;
+        for other in USER_METHODS.iter().filter(|m| **m != method_id) {
+            stopped |= disable_user(other).unwrap_or(false);
+        }
+        // A service manager's agent stops with its service. A new one started by a service manager
+        // waited for it as a standby; the session's starts only while none runs, so it starts now
+        if method_id == "session" && stopped {
+            let deadline = Instant::now() + Duration::from_secs(3);
+            while runtime::agent_running() && Instant::now() < deadline {
+                std::thread::sleep(Duration::from_millis(100));
+            }
+            start_agent_now()?;
+        }
     }
+    Ok(())
 }
 
-fn disable_user(method_id: &str) -> Result<()> {
+/// Turns a per-user way off if it is on; `true` when it was on (its agent stops with it).
+fn disable_user(method_id: &str) -> Result<bool> {
     match method_id {
-        "session" if Xdg::real().enabled() => Xdg::real().disable(false),
+        "session" if Xdg::real().enabled() => Xdg::real().disable(false).map(|_| false),
         "systemd-user" if systemd_user_available() && systemd_user_enabled() => {
             systemd_user_disable();
-            Ok(())
+            Ok(true)
         }
         "dinit-user" if which("dinitctl").is_some() && dinit_user_enabled() => {
             dinit_user_disable();
-            Ok(())
+            Ok(true)
         }
         "runit-user" if runit_user_enabled() => {
             runit_user_disable();
-            Ok(())
+            Ok(true)
         }
-        _ => Ok(()),
+        _ => Ok(false),
     }
 }
 

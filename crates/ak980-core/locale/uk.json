@@ -12,6 +12,7 @@
  "30 min": "30 хв",
  "5 min": "5 хв",
  "A key plays a macro once you assign it on the Keys page.": "Клавіша відтворює макрос, коли ви призначите його на сторінці «Клавіші».",
+ "A key plays a macro once you assign it on the Keys page. Keys refer to macros by number: after deleting one, write the macros and both key layers again.": "Клавіша грає макрос, коли його призначено на сторінці «Клавіші». Клавіші посилаються на макроси за номером: після видалення запишіть знову макроси й обидва шари клавіш.",
  "A macro is text:..., combo:... or steps:...": "Макрос задається як text:..., combo:... або steps:...",
  "A macro's number is its slot in the keyboard; keys refer to it on the Keys page.": "Номер макросу — це його слот у клавіатурі; клавіші посилаються на нього на сторінці «Клавіші».",
  "A profile holds the lighting, per-key colours, both key layers, macros and keyboard options. Switching sends it to the keyboard.": "Профіль містить підсвітку, кольори клавіш, обидва шари клавіш, макроси та опції клавіатури. Перемикання надсилає його в клавіатуру.",
@@ -261,6 +262,7 @@
  "Macro": "Макрос",
  "Macro {n}": "Макрос {n}",
  "Macro {n}: {name}. Assign it to a key: ak980 remap KEY macro:{n}": "Макрос {n}: {name}. Призначте його клавіші: ak980 remap КЛАВІША macro:{n}",
+ "Macro “{name}” deleted. The macros after it moved up by one.": "Макрос «{name}» видалено. Наступні макроси зсунулись на один.",
  "Macros": "Макроси",
  "Macros need {used} of {total} bytes of keyboard memory; remove some steps": "Макросам треба {used} з {total} байт пам'яті клавіатури; приберіть частину кроків",
  "Macros written to the keyboard ({n}).": "Макроси записано в клавіатуру ({n}).",
@@ -524,6 +526,7 @@
  "Type text…": "Набрати текст…",
  "USB cable": "USB-кабель",
  "Undo": "Скасувати",
+ "Undo deleting": "Повернути видалене",
  "Unknown PC effect: {name}": "Невідомий ефект ПК: {name}",
  "Unknown key action: {spec}": "Невідома дія клавіші: {spec}",
  "Unknown key: {name}": "Невідома клавіша: {name}",
@@ -641,6 +644,11 @@
   "{n} клавіша розфарбована",
   "{n} клавіші розфарбовані",
   "{n} клавіш розфарбовано"
+ ],
+ "{n} key that played it does what is printed on it again.": [
+  "{n} клавіша, що його грала, знову робить те, що на ній написано.",
+  "{n} клавіші, що його грали, знову роблять те, що на них написано.",
+  "{n} клавіш, що його грали, знову роблять те, що на них написано."
  ],
  "{n} macro written": [
   "Записано {n} макрос",

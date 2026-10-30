@@ -9,7 +9,7 @@ use clap::{value_parser, Arg, ArgAction, ArgMatches, Command};
 use ak980_core::config::{self, Config, Launcher, LightSource, Profile, Rule};
 use ak980_core::device::{self, AnyKeyboard, Dongle, Link, WiredKeyboard, LCD_MAX_FRAMES, LCD_PAGE};
 use ak980_core::effects::{self, ParamKind, EFFECTS};
-use ak980_core::i18n::{self, tr};
+use ak980_core::i18n::{self, plural, tr};
 use ak980_core::keymap::{encode_layer, KeyAction, LAUNCHER_KEYS};
 use ak980_core::lcd::{self, Fit, RenderOptions, Source, TEXT_POSITIONS};
 use ak980_core::lighting::{self, CAP_COLOR, DIRECTIONS, LIGHT_MODES, SIDE_LIGHT_MODES, SLEEP_CHOICES};
@@ -614,17 +614,29 @@ fn cmd_macro(m: &ArgMatches, cfg: &mut Config) -> Result<()> {
         }
         "rm" => {
             let i = *sub.get_one::<usize>("index").expect("required");
-            if i >= p.macros.len() {
-                return Err(Error::invalid(format!("{i}")));
-            }
-            let removed = p.macros.remove(i);
+            let Some((removed, reset)) = p.remove_macro(i) else { return Err(Error::invalid(format!("{i}"))) };
             say(tr!("Removed: {name}. The macros after it moved up by one.", name = removed.name));
+            if reset > 0 {
+                say(plural(reset as i64, "{n} key that played it does what is printed on it again.",
+                           "{n} keys that played it do what is printed on them again."));
+            }
         }
-        "clear" => p.macros.clear(),
+        "clear" => {
+            for i in (0..p.macros.len()).rev() {
+                p.remove_macro(i);
+            }
+        }
         _ => {} // upload: send what the profile has
     }
     let list = p.macros.clone();
-    WiredKeyboard::open()?.set_macros(&list)?;
+    let (top, fn_layer) = (p.keymap_top.clone(), p.keymap_fn.clone());
+    let mut kb = WiredKeyboard::open()?;
+    kb.set_macros(&list)?;
+    // Keys refer to macros by slot: the layers follow when a removal moved them
+    if action == "rm" || action == "clear" {
+        kb.set_keymap(false, &top)?;
+        kb.set_keymap(true, &fn_layer)?;
+    }
     cfg.save()?;
     say(tr!("Macros written to the keyboard ({n}).", n = list.len()));
     Ok(())

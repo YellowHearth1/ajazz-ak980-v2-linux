@@ -664,7 +664,8 @@ impl Agent {
                 link_state = Some(state);
             }
 
-            if let Some(reason) = reason.as_deref().filter(|_| settings.clock_auto) {
+            // `--once` is asked for by hand or by a timer: it syncs whatever the setting says
+            if let Some(reason) = reason.as_deref().filter(|_| settings.clock_auto || once) {
                 if reason.starts_with("connected") && !once {
                     wait(&STOP, Duration::from_secs(2)); // let the firmware bring up every interface
                 }

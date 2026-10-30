@@ -14,7 +14,7 @@ use serde_json::{Map, Value};
 
 use crate::error::{Error, Result};
 use crate::i18n::tr;
-use crate::keymap::KeyAction;
+use crate::keymap::{ActionKind, KeyAction};
 use crate::lighting::{KeyboardOptions, LightSettings};
 use crate::macros::Macro;
 use crate::{paths, tr};
@@ -107,6 +107,30 @@ impl Profile {
 
     pub fn layer_mut(&mut self, fn_layer: bool) -> &mut BTreeMap<u8, KeyAction> {
         if fn_layer { &mut self.keymap_fn } else { &mut self.keymap_top }
+    }
+
+    /// Removes macro `i`. Keys refer to macros by slot, so the keys that played it go back to their
+    /// default and the keys of the macros after it follow them one slot up. Returns the macro and
+    /// how many keys were reset.
+    pub fn remove_macro(&mut self, i: usize) -> Option<(Macro, usize)> {
+        if i >= self.macros.len() {
+            return None;
+        }
+        let removed = self.macros.remove(i);
+        let mut reset = 0;
+        for layer in [&mut self.keymap_top, &mut self.keymap_fn] {
+            layer.retain(|_, a| {
+                let gone = a.kind == ActionKind::Macro && usize::from(a.macro_slot) == i;
+                reset += usize::from(gone);
+                !gone
+            });
+            for a in layer.values_mut() {
+                if a.kind == ActionKind::Macro && usize::from(a.macro_slot) > i {
+                    a.macro_slot -= 1;
+                }
+            }
+        }
+        Some((removed, reset))
     }
 }
 
@@ -377,13 +401,15 @@ impl Config {
         serde_json::to_string_pretty(&file).expect("config serializes")
     }
 
-    /// Writes atomically: a temporary file renamed over the old one.
+    /// Writes atomically: a temporary file renamed over the old one. The window, the agent and the
+    /// CLI save the same file, so each process writes its own temporary file; a shared one could be
+    /// renamed into place by another process while it is half-written.
     pub fn save(&self) -> Result<()> {
         if let Some(dir) = self.path.parent() {
             fs::create_dir_all(dir)?;
         }
         let mut tmp = self.path.as_os_str().to_owned();
-        tmp.push(".tmp");
+        tmp.push(format!(".{}.tmp", std::process::id()));
         let tmp = PathBuf::from(tmp);
         fs::write(&tmp, self.to_json() + "\n")?;
         fs::rename(&tmp, &self.path)?;
@@ -519,6 +545,27 @@ mod tests {
         assert_eq!(cfg.profiles.len(), 1);
         let dir = path.parent().unwrap();
         assert!(fs::read_dir(dir).unwrap().any(|e| e.unwrap().file_name().to_string_lossy().contains(".broken-")));
+    }
+
+    #[test]
+    fn removing_a_macro_keeps_keys_on_the_macros_they_play() {
+        let mut p = Profile::default();
+        for name in ["A", "B", "C"] {
+            p.macros.push(Macro::parse("text:x", Some(name)).unwrap());
+        }
+        let play = |slot| KeyAction::macro_(slot, crate::keymap::MacroMode::Once, 1);
+        p.keymap_top.insert(10, play(0));
+        p.keymap_top.insert(11, play(1));
+        p.keymap_fn.insert(12, play(2));
+        p.keymap_fn.insert(13, KeyAction::off());
+        let (removed, reset) = p.remove_macro(1).unwrap();
+        assert_eq!((removed.name.as_str(), reset), ("B", 1));
+        assert_eq!(p.macro_names(), ["A", "C"]);
+        assert_eq!(p.keymap_top.get(&10), Some(&play(0)));
+        assert_eq!(p.keymap_top.get(&11), None, "the key that played B does its own thing again");
+        assert_eq!(p.keymap_fn.get(&12), Some(&play(1)), "C moved up, and so did its key");
+        assert_eq!(p.keymap_fn.get(&13), Some(&KeyAction::off()));
+        assert!(p.remove_macro(5).is_none());
     }
 
     #[test]

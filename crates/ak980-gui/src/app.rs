@@ -24,6 +24,8 @@ pub enum Message {
     Polled(Status),
     SystemTheme(iced::theme::Mode),
     Tick(Instant),
+    /// The window is about to close: what is not saved yet is written first.
+    CloseRequested,
     /// A keyboard operation finished: the notice to show, or the error.
     Done(Result<String, String>),
     SwitchProfile(String),
@@ -72,6 +74,9 @@ pub struct App {
     pub busy: Option<String>,
     pub drafts: HashMap<String, String>,
     config_mtime: Option<SystemTime>,
+    saved_at: Option<Instant>,
+    /// Changes made since the last write of the settings file.
+    unsaved: bool,
     pub lighting: pages::lighting::State,
     pub colours: pages::colours::State,
     pub keys: pages::keys::State,
@@ -113,6 +118,8 @@ impl App {
         let theme = theme::activate(theme::roles_for(&s.theme, &s.accent, &s.colorway, system_dark));
         let app = Self {
             config_mtime: config::mtime(&cfg.path),
+            saved_at: None,
+            unsaved: false,
             cfg,
             page: Page::Lighting,
             system_dark,
@@ -159,12 +166,30 @@ impl App {
         }
     }
 
-    /// Saves the settings; a failure becomes a notice.
+    /// Saves the settings, at most twice a second: a drag over the keys or a slider sends a message
+    /// for every step. The rest is written on the next tick or poll, and when the window closes.
     pub fn save(&mut self) {
+        if self.saved_at.is_some_and(|t| t.elapsed() < SAVE_GAP) {
+            self.unsaved = true;
+        } else {
+            self.save_now();
+        }
+    }
+
+    /// Writes the settings file now; a failure becomes a notice.
+    fn save_now(&mut self) {
+        self.unsaved = false;
+        self.saved_at = Some(Instant::now());
         if let Err(e) = self.cfg.save() {
             self.notify(tr!("Error: {message}", message = e), true);
         }
         self.config_mtime = config::mtime(&self.cfg.path);
+    }
+
+    fn save_if_due(&mut self) {
+        if self.unsaved && self.saved_at.is_none_or(|t| t.elapsed() >= SAVE_GAP) {
+            self.save_now();
+        }
     }
 
     /// Runs a keyboard operation on its own thread; `busy` is shown while it runs.
@@ -187,6 +212,7 @@ impl App {
                 if page == Page::Device { pages::device::refresh() } else { Task::none() }
             }
             Message::Poll => {
+                self.save_if_due();
                 let read = self.battery_at.is_none_or(|t| t.elapsed() > Duration::from_secs(60));
                 self.toasts.retain(|t| t.at.elapsed() < Duration::from_secs(if t.error { 9 } else { 5 }));
                 Task::perform(blocking(move || poll_status(read)), |s| Message::Polled(s.unwrap_or_default()))
@@ -202,10 +228,16 @@ impl App {
                 if status.link != Some(Link::Dongle) {
                     self.battery = None;
                 }
-                // Another program (the CLI, the agent switching profiles) changed the settings
-                if status.config_mtime.is_some() && status.config_mtime != self.config_mtime {
+                // Another program (the CLI, the agent switching profiles) changed the settings. A
+                // time older than our own last write is a poll that started before that write.
+                if status.config_mtime.is_some() && status.config_mtime > self.config_mtime {
+                    self.unsaved = false; // the newer file wins over changes not written yet
                     self.config_mtime = status.config_mtime;
+                    let active = std::mem::take(&mut self.cfg.active);
                     self.cfg = Config::load();
+                    if self.cfg.active != active {
+                        self.profiles.rename.clear(); // a name typed for the profile that was active
+                    }
                     self.apply_theme();
                 }
                 self.status = status;
@@ -217,9 +249,16 @@ impl App {
                 Task::none()
             }
             Message::Tick(now) => {
+                self.save_if_due(); // the PC effect reads its settings from the file
                 pages::lighting::tick(self, now);
                 pages::screen::tick(self, now);
                 Task::none()
+            }
+            Message::CloseRequested => {
+                if self.unsaved {
+                    self.save_now();
+                }
+                iced::exit()
             }
             Message::Done(result) => {
                 self.busy = None;
@@ -287,6 +326,7 @@ impl App {
         let mut subs = vec![
             iced::time::every(Duration::from_secs(2)).map(|_| Message::Poll),
             iced::system::theme_changes().map(Message::SystemTheme),
+            iced::window::close_requests().map(|_| Message::CloseRequested),
         ];
         if pages::lighting::animating(self) || pages::screen::animating(self) {
             subs.push(iced::time::every(Duration::from_millis(33)).map(Message::Tick));
@@ -456,6 +496,9 @@ impl App {
             .into()
     }
 }
+
+/// The shortest time between two writes of the settings file.
+const SAVE_GAP: Duration = Duration::from_millis(500);
 
 /// `Length` re-export for the pages.
 pub const PREVIEW_HEIGHT: Length = Length::Fixed(300.0);
