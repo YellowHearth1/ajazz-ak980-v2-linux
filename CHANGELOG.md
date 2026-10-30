@@ -6,8 +6,11 @@
   and every hour. Every clock packet shows the AK980 V2's clock page, so the animation used to give
   way to the clock after each start of the computer. Hourly, daily, weekly or only by hand on the
   *Device* page and with `ak980 time --auto`; a new time zone is followed at once.
-- White balance: red, green and blue gains for every colour sent to the keyboard, because white
-  looks pink on its LEDs; *Show white on the keyboard* to compare, `ak980 light --balance`.
+- Calibration: a page of its own for how colours come out on the LEDs: per channel a strength (white
+  looks pink, the red LEDs are the strongest) and a curve, tuned live on every key in a test colour;
+  `ak980 light --balance` for the strengths.
+- The AJAZZ logo light: no command reaches it, but the keyboard's own Fn + Z switches it off; the
+  Lighting page lists that and the keyboard's other own keys.
 - Reminders: at a set time a notification, the keys calling for attention (five patterns, any
   colour, for the minutes asked) and, if asked, the text blinking on the screen with the last
   animation put back afterwards; `ak980 remind`.
