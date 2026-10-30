@@ -27,6 +27,10 @@ and 4, matched by `bInterfaceNumber`, and sets every other interface of both to 
 carry keystrokes. Since udev leaves a node alone when no rule sets its mode or group, that also
 takes back what the 0.0.1 rule gave them as soon as the rules are applied again.
 
+Checked on 2026-10-30: in sysfs the cable has interfaces 0–3 with the usage pages above and no
+interface 4; the user may open the cable's 2 and 3 and the dongle's 3 and 4, and is refused the
+cable's 0 and 1 and the dongle's 0–2; the clock and a lighting command go through over the cable.
+
 In 2.4 GHz mode the keyboard's own USB interfaces disappear (the cable only charges), so the dongle
 is the only way to reach it. The vendor driver does not configure the keyboard over the dongle either.
 
