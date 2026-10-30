@@ -193,11 +193,12 @@ open (2026-10-29), the dongle sent nothing it was not asked for, and typing does
 or 4. The udev rule opens interfaces 3 and 4 to the user and leaves 0–2, which carry keystrokes, to
 root.
 
-The one report the dongle has sent unasked so far came on interface 3 on 2026-10-30, one second after
-the keyboard was switched from 2.4 GHz to the cable: `55 FC 04` and 29 zero bytes, without a byte sum.
-Its meaning is not known; it looks like the dongle noticing that the keyboard left the radio link. The
-agent writes every such report to `link.log`, so a real dropout should show whether the dongle says the
-same then.
+The one report the dongle has sent unasked so far is `55 FC 04` and 29 zero bytes, without a byte
+sum, on interface 3. It came twice on 2026-10-30: one second after the keyboard was switched from
+2.4 GHz to the cable, and about a minute after the cable was pulled while the keyboard was being
+cleaned (the keyboard had gone over to 2.4 GHz and was then switched off). Both times the keyboard
+left the radio link, so that is most likely what it reports. The agent writes every such report to
+`link.log`, so a real dropout should show whether the dongle says the same then.
 
 ## What has been verified
 
