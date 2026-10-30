@@ -137,7 +137,7 @@ pub const EFFECTS: [EffectInfo; 10] = [
     },
     EffectInfo {
         id: "monitor", name: "System monitor",
-        description: "The processor's load, the memory in use or the processor's temperature as a bar on a row of keys.",
+        description: "The processor's load, the memory in use or the processor's temperature as a bar on a row of keys: the longer and the redder, the higher.",
         params: &[
             choice("source", "Shows", "cpu", SOURCE_CHOICES), choice("row", "Where", "numbers", ROW_CHOICES),
             color("low", "Low", [40, 200, 90]), color("high", "High", [255, 50, 30]),
@@ -581,10 +581,14 @@ impl Effect for Monitor {
         };
         let mut out = vec![background; n];
         let m = row.len().max(1) as f32;
+        // The whole bar takes the colour of the reading: green while idle, red under load. The rest of
+        // the row glows faintly, so the bar is seen to be short rather than missing.
+        let bar = mix(low, high, self.shown);
+        let track = mix(background, bar, 0.12);
         for (j, &i) in row.iter().enumerate() {
-            // The last lit key shows how far into it the reading goes
-            let fill = ((self.shown - j as f32 / m) * m).clamp(0.0, 1.0);
-            out[i] = mix(background, mix(low, high, (j as f32 + 0.5) / m), fill);
+            // The last lit key shows how far into it the reading goes; the first is always lit
+            let fill = ((self.shown - j as f32 / m) * m).clamp(if j == 0 { 1.0 } else { 0.0 }, 1.0);
+            out[i] = mix(track, bar, fill);
         }
         out
     }
@@ -698,11 +702,12 @@ mod tests {
         }
         let row: Vec<usize> = (0..pos.len()).filter(|&i| (0x1E..=0x27).contains(&crate::layout::keys()[i].code)).collect();
         assert_eq!(row.len(), 10, "1 to 0");
-        let lit = |i: usize| colors[i].iter().sum::<f32>() > 0.3;
+        let glow = |i: usize| colors[i].iter().sum::<f32>();
         let key = |code: u8| (0..pos.len()).find(|&i| crate::layout::keys()[i].code == code).unwrap();
-        assert!(lit(key(0x1E)) && lit(key(0x22)), "1 and 5 are lit at 50 %");
-        assert!(!lit(key(0x25)) && !lit(key(0x2E)), "8 and = are not");
-        assert!(!lit(key(0x29)), "Esc keeps the background");
+        assert!(glow(key(0x1E)) > 0.6 && glow(key(0x22)) > 0.6, "1 and 5 are lit at 50 %");
+        let track = glow(key(0x25));
+        assert!(track < 0.6 && glow(key(0x2E)) < 0.6, "8 and = only glow faintly");
+        assert!(glow(key(0x29)) < track, "Esc keeps the background, darker than the track");
     }
 
     #[test]

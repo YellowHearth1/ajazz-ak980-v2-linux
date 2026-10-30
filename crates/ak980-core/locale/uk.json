@@ -564,7 +564,7 @@
  "The measured cycles are forgotten; the agent measures again from the readings to come.": "Виміряні цикли забуто; фонова служба вимірюватиме знову з наступних показів.",
  "The next profile": "Наступний профіль",
  "The path to the program cannot be used in a service: {path}": "Шлях до програми не можна записати в службу: {path}",
- "The processor's load, the memory in use or the processor's temperature as a bar on a row of keys.": "Навантаження чи температура процесора або зайнята пам'ять смужкою на ряду клавіш.",
+ "The processor's load, the memory in use or the processor's temperature as a bar on a row of keys: the longer and the redder, the higher.": "Навантаження чи температура процесора або зайнята пам'ять смужкою на ряду клавіш: що довша й червоніша, то вище.",
  "The receiver was reconnected. Give the keyboard a few seconds to find it again.": "Ресівер перепідключено. Дайте клавіатурі кілька секунд, щоб знову його знайти.",
  "The screen interface (0xFF68) was not found": "Інтерфейс екрана (0xFF68) не знайдено",
  "The service script has an error:\n{msg}": "У скрипті служби помилка:\n{msg}",
