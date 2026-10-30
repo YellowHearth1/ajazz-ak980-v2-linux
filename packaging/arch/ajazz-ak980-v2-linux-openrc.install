@@ -1,6 +1,0 @@
-# The service leaves its runlevel before its script goes. Nothing here may fail the transaction.
-
-pre_remove() {
-  rc-service ak980d stop >/dev/null 2>&1 || true
-  rc-update del ak980d default >/dev/null 2>&1 || true
-}

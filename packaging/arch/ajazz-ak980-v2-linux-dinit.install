@@ -1,8 +1,0 @@
-# The service is switched off while its description is still there. dinit would skip a missing
-# description in boot.d, but a clean disable leaves nothing behind. Nothing here may fail the
-# transaction: without a running dinit (a chroot, say) there is nothing to switch off.
-
-pre_remove() {
-  dinitctl disable ak980d >/dev/null 2>&1 || true
-  dinitctl stop ak980d >/dev/null 2>&1 || true
-}

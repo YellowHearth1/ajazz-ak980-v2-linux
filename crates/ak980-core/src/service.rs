@@ -7,8 +7,9 @@
 //! with its own directories; they are read from the running instance, never assumed.
 //!
 //! System-wide (clock only, works without logging in), installed with root rights: systemd,
-//! OpenRC, dinit, runit and s6. Packages ship the service files; for the AppImage or a source
-//! install they are written from the templates in `ak980/data/init` with the path to the program.
+//! OpenRC, dinit, runit and s6. The package ships only the systemd units; every other service is
+//! written when it is switched on, from the templates in `ak980/data/init` (built into the
+//! program) with the path to the program.
 //!
 //! None of this may keep a system from booting. dinit will not start `boot` at all while a service
 //! it waits for has a description it cannot load (a missing description it skips), and the user's
@@ -424,8 +425,10 @@ impl Dinit {
         run(&argv, SHORT)
     }
 
+    /// A link whose description has gone (with the package that shipped it, say) does not count:
+    /// dinit skips it at boot.
     fn enabled(&self, name: &str) -> bool {
-        lexists(self.boot_dir.join(name))
+        self.boot_dir.join(name).exists()
     }
 
     /// Puts `text` in place as the description `name` once dinit's checker has accepted it.
@@ -452,9 +455,21 @@ impl Dinit {
     /// Enables `name` (dinit loads it first and refuses one it cannot load); a description we just
     /// wrote unchecked goes again if dinit refused it.
     fn enable(&self, name: &str, unchecked: bool) -> Result<()> {
+        // dinitctl answers "already enabled" to any link of that name, even one to a description
+        // that has gone, so such a link makes way for the new one (and comes back if dinit refuses)
+        let link = self.boot_dir.join(name);
+        let stale = fs::read_link(&link).ok().filter(|_| !link.exists());
+        if stale.is_some() {
+            let _ = fs::remove_file(&link);
+        }
         let r = self.ctl(&["enable", name]);
-        if r.code != 0 && unchecked && !self.enabled(name) {
-            let _ = fs::remove_file(self.dir.join(name));
+        if r.code != 0 {
+            if let Some(target) = stale.filter(|_| !lexists(&link)) {
+                let _ = std::os::unix::fs::symlink(target, &link);
+            }
+            if unchecked && !self.enabled(name) {
+                let _ = fs::remove_file(self.dir.join(name));
+            }
         }
         check(r)
     }
@@ -1104,12 +1119,36 @@ mod tests {
         assert!(!dinit.write("ak980-agent", &good).unwrap(), "checked, so not left for dinitctl to judge");
         dinit.enable("ak980-agent", false).unwrap();
         assert!(dinit.enabled("ak980-agent"));
+
+        // The link left by a description that went with its package: off, and switching on mends it
+        let link = dinit.boot_dir.join("ak980-agent");
+        fs::remove_file(&link).unwrap();
+        std::os::unix::fs::symlink(d.join("gone/ak980-agent"), &link).unwrap();
+        assert!(!dinit.enabled("ak980-agent"));
+        dinit.enable("ak980-agent", false).unwrap();
+        assert!(dinit.enabled("ak980-agent"), "a fresh link to the description");
+
         dinit.disable("ak980-agent");
         assert!(!dinit.enabled("ak980-agent"));
 
         let _ = dinit.ctl(&["shutdown"]);
         let _ = daemon.kill(); // our own child, by its handle
         let _ = daemon.wait();
+        let _ = fs::remove_dir_all(d);
+    }
+
+    #[test]
+    fn dinit_link_to_a_description_that_went_is_not_enabled() {
+        let d = temp("dinit-stale");
+        let boot = d.join("boot.d");
+        fs::create_dir_all(&boot).unwrap();
+        let dinit = Dinit { dir: d.clone(), boot_dir: boot.clone(), ctl: vec![] };
+        std::os::unix::fs::symlink(d.join("gone/ak980-agent"), boot.join("ak980-agent")).unwrap();
+        assert!(!dinit.enabled("ak980-agent"));
+        fs::write(d.join("ak980-agent"), "type = process\n").unwrap();
+        fs::remove_file(boot.join("ak980-agent")).unwrap();
+        std::os::unix::fs::symlink(d.join("ak980-agent"), boot.join("ak980-agent")).unwrap();
+        assert!(dinit.enabled("ak980-agent"));
         let _ = fs::remove_dir_all(d);
     }
 
