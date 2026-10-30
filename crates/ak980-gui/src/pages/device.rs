@@ -5,7 +5,6 @@ use ak980_core::device::{self, AnyKeyboard, Link, WiredKeyboard};
 use ak980_core::i18n::{self, tr, LANGUAGES};
 use ak980_core::lighting::SLEEP_CHOICES;
 use ak980_core::service::{self, Method};
-use ak980_core::battery::{self, Measurements};
 use ak980_core::{paths, permissions, tr};
 use iced::widget::{button, column, container, pick_list, row, space, text, toggler};
 use iced::{Alignment, Element, Fill, Task};
@@ -19,9 +18,6 @@ use crate::widgets::{self, caption, card, section, setting, Choice};
 pub struct State {
     pub methods: Vec<Method>,
     pub link_log: Vec<String>,
-    pub battery: Measurements,
-    /// Changes of the battery level recorded so far.
-    pub readings: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -37,9 +33,7 @@ pub enum Msg {
     Sleep(Choice<u8>),
     Response(u8),
     SendOptions,
-    Methods(Vec<Method>, Vec<String>, Measurements, usize),
-    BatteryInsights(bool),
-    MeasureAgain,
+    Methods(Vec<Method>, Vec<String>),
     Service(String, bool),
     Theme(&'static str),
     Accent(&'static str),
@@ -63,12 +57,11 @@ pub fn refresh() -> Task<Message> {
         blocking(|| {
             let log = std::fs::read_to_string(paths::link_log()).unwrap_or_default();
             let lines: Vec<String> = log.lines().rev().take(8).map(str::to_string).collect();
-            let readings = battery::read(&paths::battery_log()).len();
-            (service::methods(), lines, Measurements::load(&paths::battery_measurements()), readings)
+            (service::methods(), lines)
         }),
         |r| {
-            let (m, l, b, n) = r.unwrap_or_default();
-            wrap(Msg::Methods(m, l, b, n))
+            let (m, l) = r.unwrap_or_default();
+            wrap(Msg::Methods(m, l))
         },
     )
 }
@@ -120,20 +113,10 @@ pub fn update(app: &mut App, msg: Msg) -> Task<Message> {
                 Ok(tr("Keyboard options sent"))
             });
         }
-        Msg::Methods(m, l, b, n) => {
+        Msg::Methods(m, l) => {
             app.device.methods = m;
             app.device.link_log = l;
-            app.device.battery = b;
-            app.device.readings = n;
             return Task::none();
-        }
-        Msg::BatteryInsights(on) => app.cfg.settings.battery_insights = on,
-        Msg::MeasureAgain => {
-            let path = paths::battery_measurements();
-            if let Err(e) = std::fs::remove_file(&path).or_else(|e| if path.exists() { Err(e) } else { Ok(()) }) {
-                app.notify(e.to_string(), true);
-            }
-            return refresh();
         }
         Msg::Service(id, on) => {
             let task = app.device_task(tr("Changing how the agent starts…"), move || {
@@ -227,38 +210,6 @@ pub fn view(app: &App) -> Element<'_, Message> {
                     .menu_style(theme::menu).width(260)),
     ];
 
-    let b = &app.device.battery;
-    let mut power = vec![setting(
-        tr("Show how long the battery lasts"),
-        Some(tr("The background agent reads the charge every minute over 2.4 GHz. From whole cycles it learns how long a full charge lasts and how long charging takes, also on the cable in wired mode, where the keyboard does not tell its level.")),
-        toggler(s.battery_insights).on_toggle(|v| wrap(Msg::BatteryInsights(v))).style(theme::switch),
-    )];
-    power.push(match b.full_charge_hours() {
-        Some(h) => setting(tr!("A full charge lasts about {time}", time = battery::duration(h)), None, text("")),
-        None => setting(tr("How long a charge lasts: not measured yet"),
-                        Some(tr("Use the keyboard over 2.4 GHz from 90 % or more down to 20 % or less.")), text("")),
-    });
-    power.push(match b.charging_hours() {
-        Some(h) => setting(tr!("Charging from empty to full takes about {time}", time = battery::duration(h)), None, text("")),
-        None => setting(tr("Charging time: not measured yet"),
-                        Some(tr("Charge it from 20 % or less to full while it stays in 2.4 GHz mode, so it can tell its level.")), text("")),
-    });
-    if let Some((share, cycles)) = b.condition() {
-        power.push(setting(
-            tr!("Condition: about {share} of the first measured charge", share = format!("{}%", (share * 100.0).round())),
-            Some(tr!("Measured cycles: {cycles}. How you use the keyboard changes how long a charge lasts too, so take it as a rough guide.", cycles = cycles)),
-            text(""),
-        ));
-    }
-    if let Some(e) = st.estimate.filter(|_| s.battery_insights) {
-        power.push(setting(tr!("Now: {estimate}", estimate = battery::describe(&e)), None, text("")));
-    }
-    let start_over = (!b.discharges.is_empty() || !b.charges.is_empty()).then(|| wrap(Msg::MeasureAgain));
-    power.push(setting(
-        tr!("Readings so far: {count}", count = app.device.readings),
-        None,
-        widgets::secondary_button(tr("Measure again"), start_over),
-    ));
 
     let o = &app.cfg.profile().options;
     let sleeps: Vec<Choice<u8>> = SLEEP_CHOICES.iter().enumerate().map(|(i, c)| Choice::new(i as u8, tr(c))).collect();
@@ -315,7 +266,12 @@ pub fn view(app: &App) -> Element<'_, Message> {
     column![
         section(tr("Connection"), card(connection)),
         section(tr("Clock"), card(clock)),
-        section(tr("Battery"), card(power)),
+        row![
+            caption(tr("How long the battery lasts and how worn it is:")),
+            widgets::secondary_button(tr("Battery calibration"), Some(Message::Navigate(crate::pages::Page::Battery))),
+        ]
+        .spacing(12)
+        .align_y(Alignment::Center),
         section(tr("Keyboard options"), card(options)),
         section(tr("Background agent"), card(agent)),
         section(tr("This app"), card(appearance)),

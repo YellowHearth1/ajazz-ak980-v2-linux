@@ -80,11 +80,12 @@ mod screenshots {
     }
 
     /// The pages the README shows, each in the theme it is shown in.
-    const SHOTS: [(Page, &str); 9] = [
+    const SHOTS: [(Page, &str); 10] = [
         (Page::Lighting, "graphite"),
         (Page::Lighting, "lavender"),
         (Page::Colours, "mint"),
         (Page::Calibration, "graphite"),
+        (Page::Battery, "frost"),
         (Page::Keys, "frost"),
         (Page::Macros, "lavender"),
         (Page::Screen, "graphite"),

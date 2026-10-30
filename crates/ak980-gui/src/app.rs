@@ -43,6 +43,7 @@ pub enum Message {
     Profiles(pages::profiles::Msg),
     Reminders(pages::reminders::Msg),
     Calibration(pages::calibration::Msg),
+    Battery(pages::battery::Msg),
     Device(pages::device::Msg),
 }
 
@@ -101,6 +102,7 @@ pub struct App {
     pub profiles: pages::profiles::State,
     pub reminders: pages::reminders::State,
     pub calibration: pages::calibration::State,
+    pub battery_page: pages::battery::State,
     pub device: pages::device::State,
 }
 
@@ -171,6 +173,7 @@ impl App {
             profiles: Default::default(),
             reminders: Default::default(),
             calibration: Default::default(),
+            battery_page: Default::default(),
             device: Default::default(),
         };
         let tasks = Task::batch([
@@ -260,7 +263,11 @@ impl App {
                 if let Some(task) = restore {
                     return task;
                 }
-                if page == Page::Device { pages::device::refresh() } else { Task::none() }
+                match page {
+                    Page::Device => pages::device::refresh(),
+                    Page::Battery => pages::battery::load(),
+                    _ => Task::none(),
+                }
             }
             Message::Poll => {
                 self.save_if_due();
@@ -356,6 +363,7 @@ impl App {
             Message::Profiles(m) => pages::profiles::update(self, m),
             Message::Reminders(m) => pages::reminders::update(self, m),
             Message::Calibration(m) => pages::calibration::update(self, m),
+            Message::Battery(m) => pages::battery::update(self, m),
             Message::Device(m) => pages::device::update(self, m),
         }
     }
@@ -410,6 +418,7 @@ impl App {
         let page = match self.page {
             Page::Screen => pages::screen::view(self),
             Page::Calibration => pages::calibration::view(self),
+            Page::Battery => pages::battery::view(self),
             Page::Lighting => pages::lighting::view(self),
             Page::Colours => pages::colours::view(self),
             Page::Keys => pages::keys::view(self),

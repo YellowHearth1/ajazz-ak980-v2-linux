@@ -405,7 +405,7 @@ fn keyboard_keys() -> Element<'static, Message> {
         ])),
         iced::widget::row![
             caption(tr("Colours on the keys not as on the screen?")),
-            widgets::secondary_button(tr("Calibration"), Some(Message::Navigate(Page::Calibration))),
+            widgets::secondary_button(tr("LED colours"), Some(Message::Navigate(Page::Calibration))),
         ]
         .spacing(12)
         .align_y(iced::Alignment::Center),
