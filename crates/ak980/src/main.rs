@@ -15,7 +15,7 @@ use ak980_core::lcd::{self, Fit, RenderOptions, Source, TEXT_POSITIONS};
 use ak980_core::lighting::{self, CAP_COLOR, DIRECTIONS, LIGHT_MODES, SIDE_LIGHT_MODES, SLEEP_CHOICES};
 use ak980_core::macros::{self, Macro, BUDGET_BYTES};
 use ak980_core::profiles::{self, ALL_PARTS};
-use ak980_core::{agent, layout, paths, permissions, runtime, service, tr, Error, Result};
+use ak980_core::{agent, battery, layout, paths, permissions, runtime, service, tr, Error, Result};
 
 // ---------------------------------------------------------------- argument helpers
 
@@ -69,7 +69,11 @@ fn build() -> Command {
         .subcommand_value_name(tr("command"))
         .arg(Arg::new("lang").long("lang").global(true).value_parser(["auto", "en", "uk"]).help(tr("interface language")))
         .subcommand(sub("gui", tr("open the app window")).arg(flag("tray", tr("start hidden in the tray"))))
-        .subcommand(sub("status", tr("connection, battery, profile, agent")))
+        .subcommand(
+            sub("status", tr("connection, battery, profile, agent"))
+                .arg(flag("json", tr("print it as JSON, for scripts")))
+                .arg(flag("waybar", tr("print it as a Waybar custom module (return-type json) reads it"))),
+        )
         .subcommand(sub("list", tr("the keyboard's HID interfaces")))
         .subcommand(
             sub("time", tr("sync the screen clock with the system time"))
@@ -182,6 +186,8 @@ fn build() -> Command {
         )
         .subcommand(
             sub("launch", tr("launcher keys F13–F24: run a program or open a link"))
+                .after_help(tr!("A command can also switch profiles: {next} for the next one, {named} for one by name.",
+                                next = config::PROFILE_NEXT, named = format!("{}NAME", config::PROFILE_USE)))
                 .arg(Arg::new("key"))
                 .arg(Arg::new("command").num_args(0..).trailing_var_arg(true).allow_hyphen_values(true))
                 .arg(Arg::new("rm").long("rm").value_name("KEY"))
@@ -244,30 +250,113 @@ fn say(text: impl AsRef<str>) {
     println!("{}", text.as_ref());
 }
 
-fn cmd_status(cfg: &Config) -> Result<()> {
-    let state = device::connection_state();
-    let link = match state {
+/// What `ak980 status` reports, gathered once for every output format.
+struct StatusReport {
+    link: Option<Link>,
+    access: Option<bool>,
+    /// The charge: read now over 2.4 GHz, or the agent's last reading.
+    battery: Option<u8>,
+    battery_live: bool,
+    hours_left: Option<f32>,
+    profile: String,
+    agent: bool,
+}
+
+fn status_report(cfg: &Config) -> StatusReport {
+    let link = device::connection_state();
+    let live = (link == Some(Link::Dongle))
+        .then(Dongle::find)
+        .flatten()
+        .and_then(|info| Dongle::open_found(&info).and_then(|mut d| d.read_battery()).ok().flatten());
+    let history = battery::read(&paths::battery_log());
+    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs();
+    StatusReport {
+        link,
+        access: permissions::accessible(),
+        battery: live.or_else(|| history.last().map(|(_, l)| *l)),
+        battery_live: live.is_some(),
+        // On the cable it charges, so only a running-down battery gets an estimate
+        hours_left: (link == Some(Link::Dongle)).then(|| battery::hours_left(&history, now)).flatten(),
+        profile: cfg.active.clone(),
+        agent: runtime::agent_running(),
+    }
+}
+
+/// "about 31 h left", or in days from two days on.
+fn time_left(hours: f32) -> String {
+    if hours >= 48.0 {
+        tr!("about {days} days left", days = (hours / 24.0).round())
+    } else {
+        tr!("about {hours} h left", hours = hours.round().max(1.0))
+    }
+}
+
+fn status_lines(r: &StatusReport) -> Vec<String> {
+    let link = match r.link {
         Some(Link::Usb) => tr("USB cable"),
         Some(Link::Dongle) => tr("2.4 GHz dongle"),
         None => tr("not found"),
     };
-    say(tr!("Connection: {state}", state = link));
-    if permissions::accessible() == Some(false) {
-        say(tr("Access: no permission — run `ak980 setup`"));
+    let mut lines = vec![tr!("Connection: {state}", state = link)];
+    if r.access == Some(false) {
+        lines.push(tr("Access: no permission — run `ak980 setup`"));
     }
-    if state == Some(Link::Dongle)
-        && let Some(info) = Dongle::find()
-    {
-        let level = Dongle::open_found(&info)?.read_battery()?;
-        let text = match level {
-            Some(l) => format!("{l}%"),
-            None => tr("no answer (is the keyboard in 2.4 GHz mode and awake?)"),
+    match (r.battery, r.link) {
+        (Some(level), _) => {
+            let mut text = format!("{level}%");
+            if !r.battery_live {
+                text = tr!("{level} at the last check", level = text);
+            }
+            if let Some(h) = r.hours_left {
+                text = format!("{text}, {}", time_left(h));
+            }
+            lines.push(tr!("Battery: {level}", level = text));
+        }
+        (None, Some(Link::Dongle)) => {
+            lines.push(tr!("Battery: {level}", level = tr("no answer (is the keyboard in 2.4 GHz mode and awake?)")))
+        }
+        _ => {}
+    }
+    lines.push(tr!("Active profile: {name}", name = r.profile));
+    let agent = if r.agent { tr("running") } else { tr("not running") };
+    lines.push(tr!("Background agent: {state}", state = agent));
+    lines
+}
+
+fn cmd_status(m: &ArgMatches, cfg: &Config) -> Result<()> {
+    let r = status_report(cfg);
+    let link = match r.link {
+        Some(Link::Usb) => Some("usb"),
+        Some(Link::Dongle) => Some("2.4g"),
+        None => None,
+    };
+    if m.get_flag("json") {
+        let json = serde_json::json!({
+            "link": link, "access": r.access, "battery": r.battery, "battery_live": r.battery_live,
+            "hours_left": r.hours_left.map(|h| (h * 10.0).round() / 10.0), "profile": r.profile, "agent": r.agent,
+        });
+        say(json.to_string());
+    } else if m.get_flag("waybar") {
+        let text = match (r.link, r.battery) {
+            (Some(Link::Dongle), Some(level)) => format!("{level}%"),
+            (Some(Link::Usb), _) => "USB".to_string(),
+            (Some(Link::Dongle), None) => "2.4G".to_string(),
+            (None, _) => String::new(),
         };
-        say(tr!("Battery: {level}", level = text));
+        let mut class = vec![link.unwrap_or("absent").replace('.', "")];
+        if r.link == Some(Link::Dongle) && r.battery.is_some_and(|l| l <= 20) {
+            class.push("low".into());
+        }
+        let json = serde_json::json!({
+            "text": text, "tooltip": status_lines(&r).join("\n"), "class": class,
+            "percentage": r.battery.filter(|_| r.link == Some(Link::Dongle)),
+        });
+        say(json.to_string());
+    } else {
+        for line in status_lines(&r) {
+            say(line);
+        }
     }
-    say(tr!("Active profile: {name}", name = cfg.active));
-    let agent = if runtime::agent_running() { tr("running") } else { tr("not running") };
-    say(tr!("Background agent: {state}", state = agent));
     Ok(())
 }
 
@@ -851,7 +940,7 @@ fn run(m: &ArgMatches) -> Result<ExitCode> {
     let mut cfg = Config::load();
     match name {
         "gui" => open_gui(sub.get_flag("tray"))?,
-        "status" => cmd_status(&cfg)?,
+        "status" => cmd_status(sub, &cfg)?,
         "list" => cmd_list(),
         "time" => cmd_time(sub, &cfg)?,
         "lcd" => cmd_lcd(sub, &mut cfg)?,
