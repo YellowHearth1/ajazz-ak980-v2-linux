@@ -24,6 +24,8 @@ _ak980() {
         'service:start the agent automatically'
         'setup:let your user access the keyboard'
         'apply:send the active profile and the time to the keyboard'
+        'link:the 2.4 GHz link record'
+        'reconnect:reconnect the 2.4 GHz receiver'
     )
 
     _arguments -C \

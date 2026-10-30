@@ -10,47 +10,51 @@ pkgname=(ajazz-ak980-v2-linux
          ajazz-ak980-v2-linux-dinit
          ajazz-ak980-v2-linux-runit
          ajazz-ak980-v2-linux-s6)
-pkgver=0.0.1
+pkgver=0.0.2
 pkgrel=1
 pkgdesc="Ajazz AK980 V2 | Software for Linux: screen clock and GIFs, lighting, PC lighting effects, keys, macros, profiles"
-arch=(any)
+arch=(x86_64 aarch64)
 url="https://github.com/yellowhearth1/ajazz-ak980-v2-linux"
-license=(MIT)
-makedepends=(python-build python-installer python-setuptools python-wheel)
-checkdepends=(python-pytest python-pyqt6 python-pillow python-numpy qt6-svg)
+license=(MIT Ubuntu-font-1.0)      # the Ubuntu fonts are built into the window
+makedepends=(cargo)
 source=("$pkgbase-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
 # Run updpkgsums after tagging a release; the tarball GitHub serves is the one that counts.
-sha256sums=('e9dcbb06760d694098a1f5220633adbcc2740308de54b91ebeb2be22682c8ce3')
+sha256sums=('SKIP')
+
+prepare() {
+  cd "$pkgbase-$pkgver"
+  export RUSTUP_TOOLCHAIN=stable
+  cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
+}
 
 build() {
   cd "$pkgbase-$pkgver"
-  python -m build --wheel --no-isolation
+  export RUSTUP_TOOLCHAIN=stable CARGO_TARGET_DIR=target
+  cargo build --frozen --release
 }
 
 check() {
   cd "$pkgbase-$pkgver"
-  QT_QPA_PLATFORM=offscreen python -m pytest -q
+  export RUSTUP_TOOLCHAIN=stable CARGO_TARGET_DIR=target
+  cargo test --frozen --release --workspace
 }
 
 package_ajazz-ak980-v2-linux() {
-  depends=(python python-pyqt6 python-pillow python-numpy qt6-svg ttf-ubuntu-font-family)
+  # The window loads the display libraries at run time (Wayland or X11, Vulkan or OpenGL)
+  depends=(gcc-libs glibc libxkbcommon wayland libx11 libxcursor libxi libxrandr vulkan-icd-loader)
   optdepends=('libpulse: music lighting effects through parec'
               'pipewire: music lighting effects through pw-record'
-              'polkit: allow keyboard access and system services from the app'
-              'qt6-wayland: native Wayland window')
+              'polkit: allow keyboard access, reconnect the receiver and set up system services from the app'
+              'libnotify: notifications from the background agent (low battery, lost 2.4 GHz link)'
+              'xdg-desktop-portal: file dialogs of the desktop')
   backup=(etc/ak980/agent.conf)
   install=ajazz-ak980-v2-linux.install
 
   cd "$pkgbase-$pkgver"
-  python -m installer --destdir="$pkgdir" dist/*.whl
-  make DESTDIR="$pkgdir" PREFIX=/usr install-data install-systemd
-
-  # The Ubuntu fonts come from ttf-ubuntu-font-family; the bundled copy is for the AppImage
-  local site
-  site=$(python -c "import site; print(site.getsitepackages()[0])")
-  rm -r "$pkgdir$site/ak980/data/fonts"
+  make DESTDIR="$pkgdir" PREFIX=/usr install-bin install-data install-systemd
 
   install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  install -Dm644 ak980/data/fonts/UFL.txt "$pkgdir/usr/share/licenses/$pkgname/UFL.txt"
   install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
   install -Dm644 docs/PROTOCOL.md "$pkgdir/usr/share/doc/$pkgname/PROTOCOL.md"
 }

@@ -5,31 +5,19 @@ set -e
 cd "$(dirname "$0")"
 PREFIX="${PREFIX:-$HOME/.local}"
 APPID=io.github.yellowhearth1.AjazzAK980V2
-LIB="$PREFIX/share/ajazz-ak980-v2-linux"
 
-missing=""
-python3 -c "import PyQt6.QtWidgets, PyQt6.QtSvg" 2>/dev/null || missing="$missing PyQt6 (with QtSvg)"
-python3 -c "import PIL" 2>/dev/null || missing="$missing Pillow"
-python3 -c "import numpy" 2>/dev/null || missing="$missing numpy"
-if [ -n "$missing" ]; then
-    echo "Missing Python packages:$missing"
-    echo "Arch/Artix: sudo pacman -S python-pyqt6 qt6-svg python-pillow python-numpy"
-    echo "Debian/Ubuntu: sudo apt install python3-pyqt6 python3-pyqt6.qtsvg python3-pil python3-numpy"
-    echo "Fedora: sudo dnf install python3-pyqt6 python3-pillow python3-numpy"
+if ! command -v cargo >/dev/null; then
+    echo "Rust is needed to build it: https://rustup.rs, or your distribution's cargo package"
+    echo "(Arch/Artix: sudo pacman -S cargo; Debian/Ubuntu: sudo apt install cargo; Fedora: sudo dnf install cargo)."
     exit 1
 fi
 
-echo "==> Program: $LIB"
-rm -rf "$LIB/ak980"
-mkdir -p "$LIB" "$PREFIX/bin"
-cp -r ak980 "$LIB/"
-find "$LIB" -name __pycache__ -prune -exec rm -rf {} +
-for name in ak980 ak980-gui; do
-    cmd="-m ak980"
-    [ "$name" = ak980-gui ] && cmd="-m ak980 gui"
-    printf '#!/bin/sh\nPYTHONPATH="%s${PYTHONPATH:+:$PYTHONPATH}" exec python3 %s "$@"\n' "$LIB" "$cmd" > "$PREFIX/bin/$name"
-    chmod 755 "$PREFIX/bin/$name"
-done
+echo "==> Building (cargo build --release)"
+cargo build --release --locked
+
+echo "==> Programs: $PREFIX/bin"
+install -Dm755 target/release/ak980 "$PREFIX/bin/ak980"
+install -Dm755 target/release/ak980-gui "$PREFIX/bin/ak980-gui"
 
 echo "==> Menu entry, icon, man page, completions"
 install -Dm644 packaging/linux/$APPID.desktop "$PREFIX/share/applications/$APPID.desktop"
@@ -44,7 +32,8 @@ echo "==> Access to the keyboard"
 "$PREFIX/bin/ak980" setup || echo "    Run '$PREFIX/bin/ak980 setup' later to allow access."
 
 echo "==> Background agent"
-best=$(PYTHONPATH="$LIB" python3 -c "from ak980 import service; print(service.preferred_user_method())")
+"$PREFIX/bin/ak980" service list | grep -q "dinit-user" && best=dinit-user || best=session
+"$PREFIX/bin/ak980" service list | grep -q "systemd-user" && best=systemd-user
 "$PREFIX/bin/ak980" service enable "$best" && echo "    started as: $best"
 
 case ":$PATH:" in

@@ -6,7 +6,7 @@ APPID=io.github.yellowhearth1.AjazzAK980V2
 if [ -x "$PREFIX/bin/ak980" ]; then
     for m in session systemd-user dinit-user; do "$PREFIX/bin/ak980" service disable "$m" >/dev/null 2>&1; done
 fi
-rm -rf "$PREFIX/share/ajazz-ak980-v2-linux"
+rm -rf "$PREFIX/share/ajazz-ak980-v2-linux"   # the Python install of 0.0.1
 rm -f "$PREFIX/bin/ak980" "$PREFIX/bin/ak980-gui" "$PREFIX/share/applications/$APPID.desktop" \
       "$PREFIX/share/icons/hicolor/scalable/apps/$APPID.svg" "$PREFIX/share/man/man1/ak980.1" \
       "$PREFIX/share/bash-completion/completions/ak980" "${XDG_CONFIG_HOME:-$HOME/.config}/fish/completions/ak980.fish"

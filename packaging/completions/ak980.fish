@@ -1,5 +1,5 @@
 # fish completion for ak980
-set -l cmds gui status list time agent daemon lcd effects modes light fx side custom options keys remap macro launch profile auto service setup apply
+set -l cmds gui status list time agent daemon lcd effects modes light fx side custom options keys remap macro launch profile auto service setup apply link reconnect
 complete -c ak980 -f
 complete -c ak980 -n "not __fish_seen_subcommand_from $cmds" -a gui -d 'Open the app window'
 complete -c ak980 -n "not __fish_seen_subcommand_from $cmds" -a status -d 'Connection, battery, profile, agent'
@@ -20,6 +20,8 @@ complete -c ak980 -n "not __fish_seen_subcommand_from $cmds" -a auto -d 'Switch 
 complete -c ak980 -n "not __fish_seen_subcommand_from $cmds" -a service -d 'Start the agent automatically'
 complete -c ak980 -n "not __fish_seen_subcommand_from $cmds" -a setup -d 'Allow access to the keyboard'
 complete -c ak980 -n "not __fish_seen_subcommand_from $cmds" -a apply -d 'Send the active profile'
+complete -c ak980 -n "not __fish_seen_subcommand_from $cmds" -a link -d 'The 2.4 GHz link record'
+complete -c ak980 -n "not __fish_seen_subcommand_from $cmds" -a reconnect -d 'Reconnect the 2.4 GHz receiver'
 complete -c ak980 -n "__fish_seen_subcommand_from lcd" -F
 complete -c ak980 -n "__fish_seen_subcommand_from lcd" -l fit -xa "fit fill stretch"
 complete -c ak980 -n "__fish_seen_subcommand_from fx" -xa "wave drift breath starlight reactive fire spectrum pulse"

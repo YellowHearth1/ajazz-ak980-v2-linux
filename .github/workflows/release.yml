@@ -12,24 +12,27 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
       - name: Build the AppImage
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}     # the API lookup of the Python runtime
         run: |
-          sudo apt-get update && sudo apt-get install -y libegl1 libgl1 libxkbcommon0 libfontconfig1
+          sudo apt-get update && sudo apt-get install -y librsvg2-bin
           packaging/appimage/build.sh
       - name: Source archive
         run: make dist
       - name: Release notes from CHANGELOG.md
+        id: notes
         run: |
-          awk -v v="${GITHUB_REF_NAME#v}" '$1 == "##" && $2 == v {on = 1; next} $1 == "##" {on = 0} on' \
-            CHANGELOG.md > notes.md
+          v="${GITHUB_REF_NAME#v}"
+          awk -v v="$v" '$1 == "##" && $2 == v {on = 1; next} $1 == "##" {on = 0} on' CHANGELOG.md > notes.md
           test -s notes.md
+          # "## 0.0.2 — 2026-10-30 (pre-release)" publishes a pre-release
+          if grep -E "^## $v .*pre-release" CHANGELOG.md; then echo "pre=true" >> "$GITHUB_OUTPUT"; else echo "pre=false" >> "$GITHUB_OUTPUT"; fi
       - name: Publish
         uses: softprops/action-gh-release@v3
         with:
           name: Ajazz AK980 V2 | Software for Linux ${{ github.ref_name }}
           body_path: notes.md
+          prerelease: ${{ steps.notes.outputs.pre == 'true' }}
           files: |
             dist/*.AppImage
             dist/*.tar.gz

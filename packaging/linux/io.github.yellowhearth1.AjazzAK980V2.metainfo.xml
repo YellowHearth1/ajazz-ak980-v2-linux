@@ -49,6 +49,13 @@
   </categories>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.0.2" date="2026-10-30" type="development">
+      <description>
+        <p>Written in Rust: a new window with two themes taken from the AK980 V2's colourways, a smaller
+        package, and a more reliable 2.4 GHz receiver, with a record of the link, a way to reconnect it
+        and notifications.</p>
+      </description>
+    </release>
     <release version="0.0.1" date="2026-10-29">
       <description>
         <p>First public release.</p>

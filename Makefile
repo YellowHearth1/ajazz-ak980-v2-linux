@@ -1,9 +1,13 @@
 # Ajazz AK980 V2 | Software for Linux
-# Packagers: `make DESTDIR=... PREFIX=/usr install-data install-systemd` plus one init target.
+# Build with `make` (cargo, release). Packagers: `make DESTDIR=... PREFIX=/usr install` plus one init
+# target (install-openrc, -dinit, -runit, -s6). The Python package in ak980/ is the 0.0.1
+# implementation, kept as the reference the Rust parity tests compare against (python-* targets).
 
 PREFIX     ?= /usr
 DESTDIR    ?=
+CARGO      ?= cargo
 PYTHON     ?= python3
+TARGETDIR  ?= target/release
 SYSCONFDIR ?= /etc
 BINDIR      = $(PREFIX)/bin
 DATADIR     = $(PREFIX)/share
@@ -14,32 +18,44 @@ S6DIR      ?= $(SYSCONFDIR)/s6/sv
 
 APPID   = io.github.yellowhearth1.AjazzAK980V2
 SLUG    = ajazz-ak980-v2-linux
-VERSION = $(shell $(PYTHON) -c "import ak980; print(ak980.__version__)")
+VERSION = $(shell sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n 1)
 EXE     = $(BINDIR)/ak980
 INIT    = ak980/data/init
 SUBST   = sed "s|@AK980@|$(EXE)|g"
 
-.PHONY: all wheel test lint layout install install-python install-data install-systemd install-openrc \
-        install-dinit install-runit install-s6 uninstall dist screenshots appimage clean
+.PHONY: all build test lint screenshots install install-bin install-data install-systemd install-openrc \
+        install-dinit install-runit install-s6 uninstall dist appimage clean python-test python-lint golden
 
-all: wheel
+all: build
 
-wheel:
-	$(PYTHON) -m build --wheel --no-isolation
+build:
+	$(CARGO) build --release --locked
 
 test:
-	QT_QPA_PLATFORM=offscreen $(PYTHON) -m pytest -q
+	$(CARGO) test --workspace --locked
 
 lint:
+	$(CARGO) clippy --workspace --all-targets --locked -- -D warnings
+
+# Every page in both themes and languages, drawn without a window, for the README
+screenshots:
+	AK980_SHOTS=$(CURDIR)/docs/screenshots $(CARGO) test -p ak980-gui --locked -- --ignored screenshots
+
+python-test:
+	QT_QPA_PLATFORM=offscreen $(PYTHON) -m pytest -q
+
+python-lint:
 	$(PYTHON) -m pyflakes ak980 tests tools
 
-layout:
-	QT_QPA_PLATFORM=offscreen $(PYTHON) tools/layout_audit.py
+# What the Python version sends to the keyboard, for crates/ak980-core/tests/parity.rs
+golden:
+	$(PYTHON) tools/golden.py
 
-install: install-python install-data install-systemd
+install: install-bin install-data install-systemd
 
-install-python:
-	$(PYTHON) -m installer --destdir="$(DESTDIR)" dist/*.whl
+install-bin:
+	install -Dm755 $(TARGETDIR)/ak980 "$(DESTDIR)$(BINDIR)/ak980"
+	install -Dm755 $(TARGETDIR)/ak980-gui "$(DESTDIR)$(BINDIR)/ak980-gui"
 
 install-data:
 	install -Dm644 ak980/data/60-ajazz-ak980.rules "$(DESTDIR)$(UDEVDIR)/60-ajazz-ak980.rules"
@@ -85,6 +101,7 @@ install-s6:
 	chmod 755 "$(DESTDIR)$(S6DIR)/ak980d-srv/run"
 
 uninstall:
+	rm -f "$(DESTDIR)$(BINDIR)/ak980" "$(DESTDIR)$(BINDIR)/ak980-gui"
 	rm -f "$(DESTDIR)$(UDEVDIR)/60-ajazz-ak980.rules" "$(DESTDIR)$(DATADIR)/applications/$(APPID).desktop" \
 	      "$(DESTDIR)$(DATADIR)/metainfo/$(APPID).metainfo.xml" "$(DESTDIR)$(DATADIR)/icons/hicolor/scalable/apps/$(APPID).svg" \
 	      "$(DESTDIR)$(DATADIR)/man/man1/ak980.1" "$(DESTDIR)$(DATADIR)/bash-completion/completions/ak980" \
@@ -103,12 +120,10 @@ dist:
 	    --transform "s|^\.|$(SLUG)-$(VERSION)|" -czf dist/$(SLUG)-$(VERSION).tar.gz .
 	@echo dist/$(SLUG)-$(VERSION).tar.gz
 
-screenshots:
-	QT_QPA_PLATFORM=offscreen AK980_PREVIEW_ONLY=1 $(PYTHON) tools/screenshots.py docs/screenshots
-
 appimage:
 	packaging/appimage/build.sh
 
 clean:
+	$(CARGO) clean
 	rm -rf build dist *.egg-info packaging/arch/src packaging/arch/pkg
 	find . -name __pycache__ -prune -exec rm -rf {} +

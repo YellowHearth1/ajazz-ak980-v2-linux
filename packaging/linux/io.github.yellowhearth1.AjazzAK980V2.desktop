@@ -10,7 +10,7 @@ Icon=io.github.yellowhearth1.AjazzAK980V2
 Terminal=false
 Categories=Settings;HardwareSettings;
 Keywords=keyboard;ajazz;ak980;rgb;lighting;gif;lcd;macro;клавіатура;підсвітка;
-StartupWMClass=ak980
+StartupWMClass=io.github.yellowhearth1.AjazzAK980V2
 SingleMainWindow=true
 Actions=sync-clock;
 

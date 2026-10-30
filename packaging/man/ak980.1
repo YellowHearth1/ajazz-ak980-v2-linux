@@ -84,6 +84,14 @@ It also replaces an older copy left in /etc/udev/rules.d, such as the one 0.0.1 
 .TP
 .B apply
 Send the active profile and the time to the keyboard.
+.TP
+.B link \fR[\fB\-n \fIlines\fR]
+Print the 2.4 GHz link record: when the keyboard answered over the receiver, when it stopped and
+when it switched between the cable and the receiver.
+.TP
+.B reconnect
+Make the PC drop the 2.4 GHz receiver and find it again, as if it had been plugged in anew (asks for
+your password). For keys that stop arriving over 2.4 GHz.
 .SH OPTIONS
 .TP
 .B \-\-lang \fRauto|en|uk
@@ -98,6 +106,9 @@ Profiles and settings.
 .TP
 .I ~/.local/share/ak980/history/
 Copies of every animation uploaded to the screen.
+.TP
+.I ~/.local/state/ak980/link.log
+The 2.4 GHz link record the agent keeps (see \fBlink\fR).
 .TP
 .I /etc/ak980/agent.conf
 Settings of the system service (clock_slot, sync_interval_min).
