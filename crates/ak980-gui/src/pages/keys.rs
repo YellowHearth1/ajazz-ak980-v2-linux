@@ -2,7 +2,7 @@
 
 use std::collections::BTreeSet;
 
-use ak980_core::config::{Config, Launcher};
+use ak980_core::config::{Config, Launcher, PROFILE_NEXT, PROFILE_USE};
 use ak980_core::device::WiredKeyboard;
 use ak980_core::i18n::tr;
 use ak980_core::keymap::{hid_keys, key_code, ActionKind, KeyAction, MacroMode, MouseFn, LAUNCHER_KEYS, MEDIA_KEYS,
@@ -239,7 +239,13 @@ fn editor(app: &App) -> Element<'_, Message> {
             let command = app.keys.launch.clone().unwrap_or_default();
             rows.push(setting(tr("Run"), None, text_input(&tr("e.g. steam, obs or https://…"), &command)
                 .on_input(|t| wrap(Msg::Command(t))).on_submit(wrap(Msg::Apply)).padding(6).style(theme::input).width(320)));
-            rows.push(caption(tr("The key sends a spare F13–F24 code, and the background agent runs the program or opens the link. It works while the agent runs.")).into());
+            let mut targets = vec![Choice::new(PROFILE_NEXT.to_string(), tr("The next profile"))];
+            targets.extend(app.cfg.profiles.iter().map(|p| Choice::new(format!("{PROFILE_USE}{}", p.name), p.name.clone())));
+            let current = targets.iter().find(|c| c.value == command).cloned();
+            rows.push(setting(tr("Or switch to"), Some(tr("Profile keys: with one on Fn+1, Fn+2…, every profile is a layer of its own.")),
+                              pick_list(targets, current, |c| wrap(Msg::Command(c.value))).placeholder(tr("a profile"))
+                                  .style(theme::pick).menu_style(theme::menu).width(220)));
+            rows.push(caption(tr("The key sends a spare F13–F24 code, and the background agent runs the program, opens the link or switches the profile. It works while the agent runs.")).into());
         }
         ActionKind::Default => rows.push(caption(tr("The key does what is printed on it.")).into()),
         ActionKind::Off => rows.push(caption(tr("The key does nothing.")).into()),

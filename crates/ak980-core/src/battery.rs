@@ -6,6 +6,8 @@ use std::fs;
 use std::io::{self, Write};
 use std::path::Path;
 
+use crate::tr;
+
 /// Lines kept in the record: weeks of readings, as a line is only written when the level changes.
 const KEEP: usize = 2000;
 
@@ -63,6 +65,15 @@ pub fn hours_left(history: &[(u64, u8)], now: u64) -> Option<f32> {
     let elapsed = now.saturating_sub(last.0) as f64 / 3600.0;
     let hours = last.1 as f64 / -slope - elapsed;
     (hours > 0.0).then_some(hours as f32)
+}
+
+/// "about 31 h left", or in days from two days on.
+pub fn time_left(hours: f32) -> String {
+    if hours >= 48.0 {
+        tr!("about {days} days left", days = (hours / 24.0).round())
+    } else {
+        tr!("about {hours} h left", hours = hours.round().max(1.0))
+    }
 }
 
 #[cfg(test)]

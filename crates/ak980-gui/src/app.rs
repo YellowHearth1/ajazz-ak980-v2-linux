@@ -7,7 +7,7 @@ use std::time::{Duration, Instant, SystemTime};
 use ak980_core::config::{self, Config};
 use ak980_core::device::{self, Dongle, Link};
 use ak980_core::i18n::tr;
-use ak980_core::{paths, permissions, runtime, tr};
+use ak980_core::{battery, paths, permissions, runtime, tr};
 use iced::futures::channel::oneshot;
 use iced::widget::{button, column, container, pick_list, row, scrollable, space, stack, text};
 use iced::{Alignment, Element, Fill, Length, Subscription, Task, Theme};
@@ -55,6 +55,8 @@ pub struct Status {
     /// The 2.4 GHz receiver is plugged in (also while the keyboard is on the cable).
     pub receiver: bool,
     pub config_mtime: Option<SystemTime>,
+    /// How long the battery lasts at its recent rate, from the agent's record (2.4 GHz only).
+    pub hours_left: Option<f32>,
 }
 
 pub struct Toast {
@@ -107,6 +109,14 @@ pub fn blocking<T: Send + 'static>(f: impl FnOnce() -> T + Send + 'static) -> im
     async move { rx.await.ok() }
 }
 
+/// "64 %", with how long it lasts when the agent's record tells.
+pub fn battery_text(level: u8, hours_left: Option<f32>) -> String {
+    match hours_left {
+        Some(h) => format!("{level}%, {}", battery::time_left(h)),
+        None => format!("{level}%"),
+    }
+}
+
 fn poll_status(read_battery: bool) -> Status {
     let link = device::connection_state();
     let battery = (read_battery && link == Some(Link::Dongle)).then(|| {
@@ -119,6 +129,10 @@ fn poll_status(read_battery: bool) -> Status {
         agent: runtime::agent_running(),
         receiver: device::receiver_usb_dir().is_some(),
         config_mtime: config::mtime(&paths::config_path()),
+        hours_left: (link == Some(Link::Dongle)).then(|| {
+            let now = SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs();
+            battery::hours_left(&battery::read(&paths::battery_log()), now)
+        }).flatten(),
     }
 }
 
@@ -437,7 +451,7 @@ impl App {
                 r.success,
                 tr("2.4 GHz"),
                 match self.battery {
-                    Some(b) => tr!("Battery: {level}", level = format!("{b}%")),
+                    Some(b) => tr!("Battery: {level}", level = battery_text(b, self.status.hours_left)),
                     None => tr("Clock and battery only"),
                 },
             ),

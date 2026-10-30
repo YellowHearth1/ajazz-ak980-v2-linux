@@ -8,10 +8,11 @@ use ak980_core::audio::AudioMeter;
 use ak980_core::config::LightSource;
 use ak980_core::device::WiredKeyboard;
 use ak980_core::effects::{self, Effect, Inputs, ParamKind, ParamValue, EFFECTS};
-use ak980_core::engine::LightingEngine;
+use ak980_core::engine::{LightingEngine, Overlays};
 use ak980_core::i18n::tr;
 use ak980_core::lighting::{self, CAP_BRIGHTNESS, CAP_COLOR, CAP_DIRECTION2, CAP_DIRECTION4, CAP_RAINBOW, CAP_SPEED,
                             DIRECTIONS, LIGHT_MODES, MAX_LEVEL};
+use ak980_core::sysinfo::SystemReadings;
 use ak980_core::{layout, paths, time::LocalTime};
 use iced::widget::{canvas, column, container, pick_list, toggler};
 use iced::{Color, Element, Fill, Task};
@@ -33,6 +34,8 @@ pub struct State {
     dirty: bool,
     engine: Option<LightingEngine>,
     audio: Option<AudioMeter>,
+    system: SystemReadings,
+    overlays: Overlays,
 }
 
 #[derive(Debug, Clone)]
@@ -46,6 +49,8 @@ pub enum Msg {
     Effect(Choice<&'static str>),
     Param(&'static str, ParamValue),
     FxBrightness(u8),
+    OverlayLocks(bool),
+    OverlayNotifications(bool),
     Key(KeyEvent),
     Sent(Option<String>),
 }
@@ -79,6 +84,16 @@ pub fn set_color(app: &mut App, what: &str, c: [u8; 3]) -> Task<Message> {
         p.light_source = LightSource::Firmware;
         app.save();
         return send(app);
+    }
+    // The colours drawn over every PC effect: "overlay/locks", "overlay/notify"
+    match what {
+        "overlay/locks" => app.cfg.settings.overlay_lock_color = c,
+        "overlay/notify" => app.cfg.settings.overlay_notify_color = c,
+        _ => {}
+    }
+    if what.starts_with("overlay/") {
+        app.save();
+        return Task::none();
     }
     // A PC effect's colour setting: "fx/<param>"
     if let Some(param) = what.strip_prefix("fx/") {
@@ -127,6 +142,16 @@ pub fn update(app: &mut App, msg: Msg) -> Task<Message> {
         }
         Msg::FxBrightness(v) => {
             app.cfg.profile_mut().host_brightness = v;
+            app.save();
+            Task::none()
+        }
+        Msg::OverlayLocks(on) => {
+            app.cfg.settings.overlay_locks = on;
+            app.save();
+            Task::none()
+        }
+        Msg::OverlayNotifications(on) => {
+            app.cfg.settings.overlay_notifications = on;
             app.save();
             Task::none()
         }
@@ -212,7 +237,11 @@ pub fn tick(app: &mut App, now: Instant) {
         inp.level = level;
         inp.beat = beat;
     }
-    let colors = fx.render(now.duration_since(t0).as_secs_f32(), dt, &inp);
+    if fx.info().needs_system {
+        inp.system = st.system.get();
+    }
+    let mut colors = fx.render(now.duration_since(t0).as_secs_f32(), dt, &inp);
+    st.overlays.apply(&mut colors, &app.cfg.settings);
     let k = p.host_brightness as f32 / 100.0;
     st.preview = leds.iter().zip(colors).map(|(l, c)| (*l, Color::from_rgb(c[0] * k, c[1] * k, c[2] * k))).collect();
 }
@@ -338,6 +367,32 @@ fn firmware_effect(app: &App) -> Element<'_, Message> {
     col.into()
 }
 
+/// What is drawn over every PC effect: the lock keys and a flash for notifications.
+fn overlays(app: &App) -> Element<'_, Message> {
+    let s = &app.cfg.settings;
+    let colour = |key: &'static str, c: [u8; 3]| -> Element<'_, Message> {
+        let key = format!("color:light:overlay/{key}");
+        color_picker(key.clone(), c, app.drafts.get(&key), move |c| Message::Draft(key.clone(), widgets::html(c)))
+    };
+    let mut rows = vec![setting(
+        tr("Lock keys"),
+        Some(tr("Caps Lock and Num Lock light up in their own colour while they are on.")),
+        toggler(s.overlay_locks).on_toggle(|v| wrap(Msg::OverlayLocks(v))).style(theme::switch),
+    )];
+    if s.overlay_locks {
+        rows.push(setting(tr("Their colour"), None, colour("locks", s.overlay_lock_color)));
+    }
+    rows.push(setting(
+        tr("Notifications"),
+        Some(tr("The keyboard flashes twice when a desktop notification comes. The app only sees that one came, never its text.")),
+        toggler(s.overlay_notifications).on_toggle(|v| wrap(Msg::OverlayNotifications(v))).style(theme::switch),
+    ));
+    if s.overlay_notifications {
+        rows.push(setting(tr("Flash colour"), None, colour("notify", s.overlay_notify_color)));
+    }
+    section(tr("Over every PC effect"), card(rows))
+}
+
 fn pc_effect(app: &App) -> Element<'_, Message> {
     let p = app.cfg.profile();
     let info = effects::info(&p.host_effect).unwrap_or(&EFFECTS[0]);
@@ -386,5 +441,5 @@ fn pc_effect(app: &App) -> Element<'_, Message> {
     if info.needs_keys {
         col = col.push(caption(tr("Click keys on the drawing to try it.")));
     }
-    col.into()
+    col.push(overlays(app)).into()
 }

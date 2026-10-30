@@ -282,15 +282,6 @@ fn status_report(cfg: &Config) -> StatusReport {
     }
 }
 
-/// "about 31 h left", or in days from two days on.
-fn time_left(hours: f32) -> String {
-    if hours >= 48.0 {
-        tr!("about {days} days left", days = (hours / 24.0).round())
-    } else {
-        tr!("about {hours} h left", hours = hours.round().max(1.0))
-    }
-}
-
 fn status_lines(r: &StatusReport) -> Vec<String> {
     let link = match r.link {
         Some(Link::Usb) => tr("USB cable"),
@@ -308,7 +299,7 @@ fn status_lines(r: &StatusReport) -> Vec<String> {
                 text = tr!("{level} at the last check", level = text);
             }
             if let Some(h) = r.hours_left {
-                text = format!("{text}, {}", time_left(h));
+                text = format!("{text}, {}", battery::time_left(h));
             }
             lines.push(tr!("Battery: {level}", level = text));
         }

@@ -162,7 +162,7 @@ pub fn view(app: &App) -> Element<'_, Message> {
         Some(Link::Dongle) => (
             tr("2.4 GHz"),
             match app.battery {
-                Some(b) => tr!("Battery: {level}", level = format!("{b}%")),
+                Some(b) => tr!("Battery: {level}", level = crate::app::battery_text(b, app.status.hours_left)),
                 None => tr("Through the dongle the keyboard only takes the clock and reports its battery."),
             },
         ),

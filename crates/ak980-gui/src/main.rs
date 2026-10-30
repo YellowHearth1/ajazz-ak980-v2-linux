@@ -135,6 +135,10 @@ mod screenshots {
             Err(_) => vec!["en".into(), "uk".into()],
         };
         let width: f32 = std::env::var("AK980_SHOTS_WIDTH").ok().and_then(|w| w.parse().ok()).unwrap_or(1240.0);
+        // AK980_SHOTS_EFFECT=monitor shows that PC effect with the overlays on; AK980_SHOTS_LAUNCH=profile:next
+        // edits the selected key as a Program or link with that command
+        let effect = std::env::var("AK980_SHOTS_EFFECT").ok();
+        let launch = std::env::var("AK980_SHOTS_LAUNCH").ok();
         for lang in &langs {
             ak980_core::i18n::set_language(lang);
             let dir = std::path::Path::new(&out).join(lang);
@@ -149,12 +153,20 @@ mod screenshots {
                 app.apply_theme();
                 app.page = page;
                 app.keys.draft = app.cfg.profile().keymap_top[&119].clone();
-                if page == Page::Lighting && theme == "lavender" {
+                if page == Page::Lighting && (theme == "lavender" || effect.is_some()) {
                     // The PC effects tab, with a frame of the rainbow wave on the drawing
                     app.cfg.profile_mut().light_source = LightSource::Host;
+                    if let Some(e) = &effect {
+                        app.cfg.profile_mut().host_effect.clone_from(e);
+                        app.cfg.settings.overlay_locks = true;
+                        app.cfg.settings.overlay_notifications = true;
+                    }
                     let t0 = std::time::Instant::now();
                     crate::pages::lighting::tick(&mut app, t0);
                     crate::pages::lighting::tick(&mut app, t0 + std::time::Duration::from_millis(900));
+                }
+                if page == Page::Keys && launch.is_some() {
+                    app.keys.launch.clone_from(&launch);
                 }
                 if page == Page::Screen {
                     app.screen.options.text = "12:34".into();
@@ -167,7 +179,8 @@ mod screenshots {
                 };
                 let iced_theme = app.theme();
                 // A picked Device page is drawn whole, so its settings at the bottom show too
-                let size = if pick.is_some() && page == Page::Device { (width, 1780.0) } else { (width, 820.0) };
+                let tall = page == Page::Device || (page == Page::Lighting && effect.is_some());
+                let size = if pick.is_some() && tall { (width, 1780.0) } else { (width, 820.0) };
                 let mut ui = iced_test::Simulator::with_size(settings, size, app.view());
                 let shot = ui.snapshot(&iced_theme).expect("drawn");
                 let mut stem = format!("{}-{theme}", format!("{page:?}").to_lowercase());

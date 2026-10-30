@@ -212,8 +212,12 @@ fn config_written_by_python_round_trips() {
     let mut diffs = Vec::new();
     json_diff("config", &g["config"], &saved, &mut diffs);
     // Settings that 0.0.2 adds; Python 0.0.1 keeps only the fields it knows, so it still loads these files
-    const NEW_IN_0_0_2: [&str; 4] = ["config.settings.notifications: python null", "config.settings.theme: python null",
-                                     "config.settings.accent: python null", "config.settings.colorway: python null"];
+    const NEW_IN_0_0_2: [&str; 8] = ["config.settings.notifications: python null", "config.settings.theme: python null",
+                                     "config.settings.accent: python null", "config.settings.colorway: python null",
+                                     "config.settings.overlay_locks: python null",
+                                     "config.settings.overlay_lock_color: python null",
+                                     "config.settings.overlay_notifications: python null",
+                                     "config.settings.overlay_notify_color: python null"];
     diffs.retain(|d| !NEW_IN_0_0_2.iter().any(|new| d.starts_with(new)));
     assert!(diffs.is_empty(), "{} differences:\n{}", diffs.len(), diffs.join("\n"));
 }
