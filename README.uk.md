@@ -101,16 +101,19 @@ sudo pacman -U ajazz-ak980-v2-linux-*-x86_64.pkg.tar.zst
 ```bash
 git clone https://github.com/yellowhearth1/ajazz-ak980-v2-linux
 cd ajazz-ak980-v2-linux/packaging/arch
-makepkg -si
+makepkg -s
+sudo pacman -U ajazz-ak980-v2-linux-[0-9]*.pkg.tar.zst
 ```
 
-`makepkg -si` завантажує реліз, указаний у PKGBUILD, збирає його через cargo й встановлює
-`ajazz-ak980-v2-linux`. Щоб зібрати саме цю копію репозиторію, спершу виконайте `make dist` і
-скопіюйте `dist/*.tar.gz` у `packaging/arch`, а тоді `makepkg -si --skipchecksums`.
+`makepkg -s` завантажує реліз, указаний у PKGBUILD, і збирає його через cargo; `pacman -U`
+встановлює основний пакет `ajazz-ak980-v2-linux`. Не `makepkg -si`: так встановилися б усі пакети,
+які робить PKGBUILD, зокрема службові для всіх чотирьох init-систем, а кожен із них потребує своєї
+init-системи. Щоб зібрати саме цю копію репозиторію, спершу виконайте `make dist` і скопіюйте
+`dist/*.tar.gz` у `packaging/arch`, а тоді `makepkg -s --skipchecksums`.
 
 PKGBUILD зроблено як спліт-пакет у стилі Artix: якщо потрібна системна служба, поставте поруч пакет
-для своєї init-системи: `ajazz-ak980-v2-linux-dinit`, `-openrc`, `-runit` або `-s6` (юніти systemd
-лежать в основному пакеті).
+для своєї init-системи: `sudo pacman -U ajazz-ak980-v2-linux-dinit-*.pkg.tar.zst` або те саме з
+`-openrc`, `-runit` чи `-s6` (юніти systemd лежать в основному пакеті).
 
 ### AppImage (будь-який дистрибутив)
 

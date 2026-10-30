@@ -100,16 +100,19 @@ installer that opens `.pkg.tar.zst` files (pamac, for one) installs it on a doub
 ```bash
 git clone https://github.com/yellowhearth1/ajazz-ak980-v2-linux
 cd ajazz-ak980-v2-linux/packaging/arch
-makepkg -si
+makepkg -s
+sudo pacman -U ajazz-ak980-v2-linux-[0-9]*.pkg.tar.zst
 ```
 
-`makepkg -si` downloads the release the PKGBUILD names, builds it with cargo and installs
-`ajazz-ak980-v2-linux`. To build the checkout itself instead, run `make dist` and copy
-`dist/*.tar.gz` into `packaging/arch` first, then `makepkg -si --skipchecksums`.
+`makepkg -s` downloads the release the PKGBUILD names and builds it with cargo; `pacman -U` installs
+the main package, `ajazz-ak980-v2-linux`. Not `makepkg -si`: that installs every package the
+PKGBUILD makes, the service packages for all four init systems among them, and each of those needs
+its own init system. To build the checkout itself instead, run `make dist` and copy `dist/*.tar.gz`
+into `packaging/arch` first, then `makepkg -s --skipchecksums`.
 
 The PKGBUILD is a split package in the Artix style; install the service package for your init
-system next to it if you want a system service: `ajazz-ak980-v2-linux-dinit`, `-openrc`, `-runit`
-or `-s6` (the systemd units are in the main package).
+system next to it if you want a system service: `sudo pacman -U ajazz-ak980-v2-linux-dinit-*.pkg.tar.zst`,
+or the same with `-openrc`, `-runit` or `-s6` (the systemd units are in the main package).
 
 ### AppImage (any distribution)
 

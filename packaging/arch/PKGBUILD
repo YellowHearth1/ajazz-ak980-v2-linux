@@ -17,6 +17,8 @@ arch=(x86_64 aarch64)
 url="https://github.com/yellowhearth1/ajazz-ak980-v2-linux"
 license=(MIT Ubuntu-font-1.0)      # the Ubuntu fonts are built into the window
 makedepends=(cargo)
+# The release profile strips the programs: a -debug package would hold no symbols
+options=(!debug)
 source=("$pkgbase-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
 # Run updpkgsums after tagging a release; the tarball GitHub serves is the one that counts.
 sha256sums=('d894e25f5d0206dbc0c286cd07f59c2c960e66be885059049ac638c4547d815d')
