@@ -2,12 +2,13 @@
 //! a colour picker and level sliders. Sizes and colours come from `theme`.
 
 use ak980_core::i18n::tr;
-use iced::widget::{button, column, container, row, slider, space, text, text_input, tooltip, Column};
+use iced::widget::{button, canvas, column, container, row, slider, space, text, text_input, tooltip, Column};
 use iced::{Alignment, Color, Element, Fill, Length};
 
 use crate::app::Message;
 use crate::fonts;
 use crate::theme::{self, roles};
+use crate::wheel::Wheel;
 
 /// An item of a drop-down list: a value and the text shown for it.
 #[derive(Clone, Debug, PartialEq)]
@@ -165,10 +166,6 @@ fn to_hsv(c: [u8; 3]) -> (f32, f32, f32) {
     (h, if max == 0.0 { 0.0 } else { d / max }, max)
 }
 
-fn from_hsv(h: f32, s: f32, v: f32) -> [u8; 3] {
-    let c = ak980_core::effects::hsv(h / 360.0, s, v);
-    c.map(|x| (x * 255.0).round().clamp(0.0, 255.0) as u8)
-}
 
 /// Colours a keyboard is often set to: the two colourways, the user's yellow, the basics.
 pub const SWATCHES: [[u8; 3]; 12] = [
@@ -190,9 +187,6 @@ pub fn color_picker<'a>(
         let tile = container(space().width(22).height(22)).style(theme::swatch(to_color(c), c == current));
         swatches = swatches.push(button(tile).padding(0).style(theme::flat).on_press(on_pick(c)));
     }
-    let (h, s, v) = to_hsv(current);
-    let pick_h = on_pick.clone();
-    let pick_s = on_pick.clone();
     let hex_value = draft.cloned().unwrap_or_else(|| html(current));
     let hex = text_input("#RRGGBB", &hex_value)
         .on_input({
@@ -204,25 +198,32 @@ pub fn color_picker<'a>(
         .padding(6)
         .style(theme::input)
         .font(fonts::MONO);
-    let preview = container(space().width(36).height(28)).style(theme::swatch(to_color(current), false));
-    let slider_row = |label: String, el: Element<'a, Message>| -> Element<'a, Message> {
-        row![caption(label).width(Length::Fixed(110.0)), el].align_y(Alignment::Center).spacing(8).into()
-    };
+    let preview = container(space().width(100).height(36)).style(theme::swatch(to_color(current), false));
+    let wheel = canvas(Wheel { hsv: to_hsv(current), on_pick: Box::new(on_pick) }).width(WHEEL).height(WHEEL);
     column![
         swatches,
-        row![preview, hex].spacing(10).align_y(Alignment::Center),
-        slider_row(tr("Hue"), slider(0.0..=359.0, h, move |x| pick_h(from_hsv(x, s, v))).step(1.0_f32).width(220)
-            .style(theme::slider_style).into()),
-        slider_row(tr("Saturation"), slider(0.0..=1.0, s, move |x| pick_s(from_hsv(h, x, v))).step(0.01_f32).width(220)
-            .style(theme::slider_style).into()),
+        row![
+            wheel,
+            column![preview, hex, caption(tr("Click or drag on the circle"))].spacing(8).width(Length::Fixed(140.0)),
+        ]
+        .spacing(16)
+        .align_y(Alignment::Center),
     ]
     .spacing(10)
     .into()
 }
 
+/// The colour wheel's size.
+const WHEEL: f32 = 128.0;
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn from_hsv(h: f32, s: f32, v: f32) -> [u8; 3] {
+        let c = ak980_core::effects::hsv(h / 360.0, s, v);
+        c.map(|x| (x * 255.0).round().clamp(0.0, 255.0) as u8)
+    }
 
     #[test]
     fn hsv_round_trip() {

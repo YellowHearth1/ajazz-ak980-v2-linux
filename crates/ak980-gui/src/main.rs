@@ -5,6 +5,7 @@ mod fonts;
 mod keyboard;
 mod pages;
 mod theme;
+mod wheel;
 mod widgets;
 
 use iced::window;
