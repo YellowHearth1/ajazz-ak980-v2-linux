@@ -7,7 +7,11 @@ only exists for Windows; this app covers what it does and adds what it could not
 keeps itself in sync with your system, lighting effects can be computed on the PC (music spectrum,
 reactive typing, fire), and profiles switch when a game starts.
 
-![Lighting effects computed on the PC, previewed on the keyboard itself](docs/screenshots/lighting-pc.png)
+Version 0.0.2 is a rewrite in Rust (the window uses [iced](https://iced.rs)) and a **pre-release**:
+it has been checked on a real AK980 V2 over the 2.4 GHz receiver, and the checks over the cable are
+still being done. 0.0.1, the Python version, stays available on the releases page.
+
+![Lighting effects computed on the PC, previewed on the keyboard itself](docs/screenshots/en/lighting-lavender.png)
 
 > Unofficial software, not affiliated with AJAZZ. [docs/PROTOCOL.md](docs/PROTOCOL.md#what-has-been-verified)
 > lists which commands were checked on a real AK980 V2 and by whom.
@@ -23,7 +27,7 @@ reactive typing, fire), and profiles switch when a game starts.
 | Lighting effects computed on the PC, streamed at 30 fps | yes | no (firmware) |
 | Key remapping on the base and Fn layers: keys, shortcuts, mouse, media, macros, several keys, programs and links | yes | no (firmware) |
 | Up to 100 macros, recorded from the keyboard or typed in | yes | no (firmware) |
-| Profiles, switched by hand, from the tray or automatically for a game | yes | lighting stays |
+| Profiles, switched by hand or automatically for a game | yes | lighting stays |
 | Win, Alt+Tab and Alt+F4 locks, Fn as a switch, sleep timer, key response | yes | no (firmware) |
 | Battery level | no (the keyboard does not report it) | yes |
 
@@ -44,10 +48,9 @@ cd ajazz-ak980-v2-linux/packaging/arch
 makepkg -si
 ```
 
-`makepkg -si` downloads the release the PKGBUILD names, checks its checksum, then builds and installs
+`makepkg -si` downloads the release the PKGBUILD names, builds it with cargo and installs
 `ajazz-ak980-v2-linux`. To build the checkout itself instead, run `make dist` and copy
-`dist/*.tar.gz` into `packaging/arch` first, then `makepkg -si --skipchecksums` (the checksum is
-the release's).
+`dist/*.tar.gz` into `packaging/arch` first, then `makepkg -si --skipchecksums`.
 
 The PKGBUILD is a split package in the Artix style; install the service package for your init
 system next to it if you want a system service: `ajazz-ak980-v2-linux-dinit`, `-openrc`, `-runit`
@@ -59,6 +62,8 @@ Download `Ajazz_AK980_V2-<version>-x86_64.AppImage` from the
 [releases](https://github.com/yellowhearth1/ajazz-ak980-v2-linux/releases), make it executable and
 start it. On first start the app asks once for your password to install the rule that lets your
 user talk to the keyboard. `./Ajazz_AK980_V2-*.AppImage time` and every other command work too.
+The AppImage holds just the two programs (about 11 MB); the window loads the display libraries of
+your system.
 
 ### From source, for your user
 
@@ -67,14 +72,15 @@ user talk to the keyboard. `./Ajazz_AK980_V2-*.AppImage time` and every other co
 ./uninstall.sh
 ```
 
-Needs Python 3.10+, PyQt6 with QtSvg, Pillow and numpy from your distribution.
+Needs Rust 1.88 or newer (`cargo`, from your distribution or [rustup](https://rustup.rs)). The
+programs link only to the C runtime libraries; the window finds Wayland or X11 and the GPU driver
+at run time and falls back to drawing on the CPU.
 
 ### Other distributions (packagers)
 
 ```bash
-python -m build --wheel --no-isolation
-python -m installer --destdir="$DESTDIR" dist/*.whl
-make DESTDIR="$DESTDIR" PREFIX=/usr install-data install-systemd   # + install-openrc / -dinit / -runit / -s6
+make                                              # cargo build --release --locked
+make DESTDIR="$DESTDIR" PREFIX=/usr install       # + install-openrc / -dinit / -runit / -s6
 ```
 
 ## First start
@@ -99,20 +105,54 @@ make DESTDIR="$DESTDIR" PREFIX=/usr install-data install-systemd   # + install-o
 
 `ak980 service list` shows what your system offers and what is enabled.
 
+**A service of this app cannot stop your system from starting.** dinit refuses to start `boot` when
+a service it waits for has a description it cannot read, and in a user's `boot` that takes D-Bus and
+the sound server down with it. So the app checks every dinit description with the installed dinit's
+own checker (`dinit-check`) before writing it, replaces files in one step so they are never half
+written, lets the init system's own tool switch the service on (it reads the service first and
+refuses a broken one) and takes away what it refused. Our services are only ever soft dependencies
+(`waits-for`, `WantedBy`), never in OpenRC's `boot` runlevel, give up restarting after a few
+failures where the init system can (systemd, dinit), and a system service only runs a program that
+nobody but root can change. The system agent gives up root for `nobody` with the `input` group.
+
+To switch the agent off by hand, from a console:
+
+| Started by | Off |
+|---|---|
+| the desktop session | `ak980 service disable session`, or delete `~/.config/autostart/ak980-agent.desktop` |
+| systemd (user) | `systemctl --user disable --now ak980-agent` |
+| dinit (user) | `dinitctl --user disable ak980-agent`; without a running dinit, `rm ~/.config/dinit.d/boot.d/ak980-agent` |
+| runit (user) | `rm -r ~/.config/service/ak980-agent` (or the folder your runsvdir watches) |
+| systemd (system) | `sudo systemctl disable --now ak980d` |
+| dinit (system) | `sudo dinitctl disable ak980d`; from a rescue shell, `rm /etc/dinit.d/boot.d/ak980d` |
+| OpenRC | `sudo rc-update del ak980d default` |
+| runit | `sudo rm /run/runit/service/ak980d` (Artix: `/etc/runit/runsvdir/default/ak980d`) |
+| s6 | `sudo s6-service delete default ak980d-srv && sudo s6-db-reload` |
+
 ## The app
 
 Start *Ajazz AK980 V2* from the menu, or `ak980` without arguments. The keyboard is drawn from its
-real layout and every page works on it.
+real layout and every page works on it. Deleting a profile or a macro, resetting a layer and
+clearing the colours can be undone until the next change.
+
+The look follows the keyboard: *Graphite* (dark) and *Lavender* (light) are the two colourways of the
+AK980 V2, and Catppuccin comes in its four flavours (Latte, Frappé, Macchiato, Mocha) with any of its
+14 accents. The keyboard on the pages can be drawn in either colourway apart from the theme, and
+*Match the theme* picks the theme that goes with it. Every combination is checked for readable
+contrast (WCAG AA).
 
 | | |
 |---|---|
-| ![Screen](docs/screenshots/screen.png) | **Screen.** Open a GIF, a picture or a folder of numbered frames. Fit, fill or stretch it; adjust brightness, contrast and saturation; change the speed or give every frame the same delay; cut frames or keep every Nth one to fit the 140-frame limit; add a caption. The strip shows every frame with its delay: select one to change its delay or delete it. The preview is the exact 16-bit image the panel will show. Uploading takes about 0.15 s per 4 KiB page. Every upload is kept under *Earlier uploads*, because the keyboard cannot give an animation back. |
-| ![Lighting](docs/screenshots/lighting.png) | **Lighting.** *Keyboard effects* are the 19 effects of the firmware; they stay when the computer is off. *PC effects* are computed here and streamed to the keys; they run while the app or the agent runs. |
-| ![Colours](docs/screenshots/colours.png) | **Colours.** Paint keys: left button paints (drag across keys), right button picks a key's colour, middle button clears it. Fill, rainbow, gradient, WASD, arrows, F row and numpad in one click. The colours are stored in the keyboard. |
-| ![Keys](docs/screenshots/keys.png) | **Keys.** Click a key, choose what it does on the base layer or while Fn is held: another key or a shortcut, a mouse button or the wheel, a media key, a macro (once, N times, until pressed again, while held), up to three keys at once, a program or a link, or nothing. *Program or link* sends one of the spare keys F13–F24, which the agent turns into the program. |
-| ![Macros](docs/screenshots/macros.png) | **Macros.** Record from the keyboard with or without your real pauses, type text, add shortcuts and mouse clicks, edit every pause. A bar shows how much of the keyboard's macro memory is used. |
-| ![Profiles](docs/screenshots/profiles.png) | **Profiles.** A profile is everything the keyboard holds plus the PC effect. Switch from the header, the tray or here; export and import them as files. *Games and programs* switches a profile while a program runs (`cs2`, `eldenring.exe`, …). |
-| ![Device](docs/screenshots/device.png) | **Device.** Keyboard options, the clock, how the agent starts, access, language. |
+| ![Screen](docs/screenshots/en/screen-graphite.png) | **Screen.** Open a GIF, a picture or a folder of numbered frames. Fit, fill or stretch it; adjust brightness, contrast and saturation; change the speed or give every frame the same delay; cut frames or keep every Nth one to fit the 140-frame limit; add a caption. The strip shows every frame with its delay: select one to change its delay or delete it. The preview is the exact 16-bit image the panel will show. Uploading takes about 0.15 s per 4 KiB page. Every upload is kept under *Earlier uploads*, because the keyboard cannot give an animation back. |
+| ![Lighting](docs/screenshots/en/lighting-graphite.png) | **Lighting.** *Keyboard effects* are the 19 effects of the firmware; they stay when the computer is off. *PC effects* are computed here and streamed to the keys; they run while the app or the agent runs. |
+| ![Colours](docs/screenshots/en/colours-graphite.png) | **Colours.** Paint keys: left button paints (drag across keys), right button picks a key's colour, middle button clears it. Fill, rainbow, gradient, WASD, arrows, F row and numpad in one click. The colours are stored in the keyboard. |
+| ![Keys](docs/screenshots/en/keys-lavender.png) | **Keys.** Click a key, choose what it does on the base layer or while Fn is held: another key or a shortcut, a mouse button or the wheel, a media key, a macro (once, N times, until pressed again, while held), up to three keys at once, a program or a link, or nothing. *Program or link* sends one of the spare keys F13–F24, which the agent turns into the program. |
+| ![Macros](docs/screenshots/en/macros-lavender.png) | **Macros.** Record from the keyboard with or without your real pauses, type text, add key presses and mouse clicks, edit every pause. A bar shows how much of the keyboard's macro memory is used. Keys refer to macros by number: after deleting one, write the macros and both key layers again (the app moves the keys of the later macros with them). |
+| ![Profiles](docs/screenshots/en/profiles-lavender.png) | **Profiles.** A profile is everything the keyboard holds plus the PC effect. Switch from the header or here; export and import them as files. *Games and programs* switches a profile while a program runs (`cs2`, `eldenring.exe`, …). |
+| ![Device](docs/screenshots/en/device-graphite.png) | **Device.** Keyboard options, the clock, how the agent starts, access, the 2.4 GHz link record and *Reconnect the receiver*, theme, keyboard colours, language, notifications. |
+
+Not in 0.0.2 yet: the tray icon of 0.0.1 (switching profiles from the panel). The agent's
+notifications (a lost 2.4 GHz link, a low battery) need `notify-send`.
 
 ## Command line
 
@@ -129,6 +169,8 @@ ak980 macro add "GG" "text:gg wp" && ak980 remap F12 macro:0
 ak980 launch F13 obs && ak980 remap F1 key:F13 --fn
 ak980 profile new Gaming --copy && ak980 auto add cs2 Gaming && ak980 auto on
 ak980 service enable dinit-user              # how the agent starts
+ak980 link                                   # the 2.4 GHz link record
+ak980 reconnect                              # re-plug the receiver (asks for your password)
 ```
 
 `man ak980` and `ak980 <command> --help` have the details. Bash, zsh and fish completions are
@@ -164,6 +206,10 @@ both interfaces open while the receiver is plugged in, so keep it running. The k
 on its own: add `usbhid.quirks=0x0c45:0xfefe:0x400` (`HID_QUIRK_ALWAYS_POLL`) to the kernel command
 line.
 
+If it happens anyway, *Reconnect the receiver* on the *Device* page (or `ak980 reconnect`) makes the
+PC drop the receiver and find it again, as if it had been plugged in anew, so you do not have to
+reach for the cable. With notifications on, the agent tells you when the keyboard stops answering.
+
 The agent also records the link in `~/.local/state/ak980/link.log`: once a minute it asks the
 keyboard for its battery over 2.4 GHz and writes down every change, and when you switch to the
 cable. After a dropout the last lines tell what failed: *did not take the request* means the
@@ -198,7 +244,9 @@ The wired protocol was reverse engineered in
 [donglover69/ak980-studio](https://github.com/donglover69/ak980-studio) (MIT), and the real-time
 stream comes from [hcode10/OpenRGB-With-AulaF108Pro-support](https://github.com/hcode10/OpenRGB-With-AulaF108Pro-support)
 (the AULA F108 Pro shares the AK980's firmware). This project ports both to Linux, verifies them on
-an AK980 V2 and builds the rest on top. The interface uses the Ubuntu font family (Ubuntu Font Licence 1.0).
+an AK980 V2 and builds the rest on top. The interface uses the Ubuntu font family (Ubuntu Font
+Licence 1.0) and the [Catppuccin](https://github.com/catppuccin/catppuccin) palette (MIT); the colour roles of the
+Graphite and Lavender themes follow its style guide.
 
 ## License
 

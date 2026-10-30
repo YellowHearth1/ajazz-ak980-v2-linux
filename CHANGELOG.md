@@ -1,7 +1,34 @@
 # Changelog
 
-## 0.0.2 — unreleased
+## 0.0.2 — unreleased (pre-release)
 
+The whole program is rewritten in Rust: the `ak980` command and agent, and a new window on iced.
+The bytes it sends to the keyboard are checked against what the Python version, verified on the
+keyboard, sends for every kind of setting. Published as a pre-release until every feature is checked
+over the cable too.
+
+- Size: the AppImage is 11 MB instead of 131 MB; the programs need only the C runtime and load the
+  display libraries of the system.
+- Themes: Graphite and Lavender from the two colourways of the AK980 V2, and Catppuccin's Latte,
+  Frappé, Macchiato and Mocha with any of its 14 accents. The keyboard on the pages can be drawn in
+  either colourway apart from the theme; every combination reads at WCAG AA.
+- Services that cannot keep a system from booting: dinit descriptions are checked with dinit's own
+  checker before they are written, files are replaced in one step, the init system's tool switches a
+  service on and a refused one is taken away again. A per-user runit service (turnstile or
+  userspawn) is new; the user's dinit is found from the running instance. The system agent gives up
+  root for `nobody` with the `input` group. The README says how to switch every kind off from a
+  console.
+- 2.4 GHz: *Reconnect the receiver* (and `ak980 reconnect`) re-plugs the receiver through its USB
+  `authorized` switch; `ak980 link` prints the link record; the agent notifies when the keyboard
+  stops answering and when its battery gets low.
+- Window: Undo after deleting a profile or a macro, resetting a layer or clearing the colours;
+  errors stay until closed; settings are written at most twice a second and before the window
+  closes.
+- Fixes: deleting a macro no longer leaves keys pointing at the wrong macro (the keys follow their
+  macros, those of the deleted one go back to default); the window, the agent and the CLI no longer
+  share one temporary file when they save the settings; turning on another way to start the agent
+  switches the old one off only once the new one works; `ak980 agent --once` always syncs.
+- Not in this version yet: the tray icon.
 - 2.4 GHz: the agent keeps the receiver's two vendor interfaces open, so that Linux polls them the
   way Windows and macOS do. Receivers of this kind can stop answering when a report waits unread
   there, which matches keys that stop arriving mid-typing until the cable goes in.

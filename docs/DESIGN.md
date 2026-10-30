@@ -1,104 +1,95 @@
 ---
-version: alpha
+version: 0.0.2
 name: Ajazz AK980 V2 | Software for Linux
 description: A configurator for one specific keyboard, built around a faithful drawing of that keyboard, for people who game and type on it every day.
-colors:
-  desk: "#191A1E"       # window ground, the desk the keyboard sits on
-  case: "#212328"       # panels: the keyboard's case
-  plate: "#1B1C20"      # inputs and lists: the plate between the keys
-  keycap: "#2B2E35"     # buttons and raised controls
-  keycap-hi: "#363A44"  # hover, selected rows
-  edge: "#383C46"       # hairlines, used sparingly
-  ink: "#ECE7DF"        # text: PBT legend white
-  ink-dim: "#A39F98"    # secondary text, 6.0:1 on case
-  ink-off: "#6F6C67"    # disabled text only
-  amber: "#FF8F1F"      # the one signal: action, selection, focus
-  ok: "#5BD08F"
-  warn: "#F2C14E"
-  error: "#FF6B5E"
+source: crates/ak980-gui/src/theme.rs (every value below lives there)
 typography:
-  display:
-    fontFamily: Ubuntu
-    fontSize: 22px (title, bold), 17px (section headings, medium)
-    fontWeight: 700 / 500
-  body:
-    fontFamily: Ubuntu
-    fontSize: 14px (text), 13px (labels)
-  data:
-    fontFamily: Ubuntu Mono
-    fontSize: 14px
+  family: Ubuntu, Ubuntu Mono for numbers that are typed or compared (bundled, Ubuntu Font Licence)
+  title: 21px medium
+  heading: 15px medium
+  text: 14px regular
+  small: 12.5px regular (hints, counts, units)
+spacing:
+  space: 8px
+  page-pad: 24px
+  sidebar: 212px
 rounded:
-  keycap: 7px
-  control: 6px
-  input: 5px
-  stage: 0
-spacing: [4, 8, 12, 20, 32]
+  radius: 8px
+  radius-small: 6px
 ---
 
-## Overview
+# Design
 
-The product configures one physical object, the AK980 V2: a 98-key board with a 1.14" TFT screen
-and a knob above the numpad. Its world is keycaps, an aluminium-grey case, light leaking between
-the keys and the vendor's own dark driver with its orange accent. The app is built from those
-materials instead of from a component kit: the window is the desk, panels are the case, controls
-are keycaps, text is legend white, and one amber signal (the vendor's brand colour, which the brief
-asked to follow) marks what you can act on.
+The window is a settings tool for one keyboard. The keyboard drawing is its centre: every page that
+touches keys works on it, and the colours of the window come from the keyboard's own colourways.
+Nothing moves for decoration; the only motion is the preview of an effect or an animation.
 
-## The signature
+## Colour roles
 
-The keyboard itself, drawn from the vendor's layout file, is the stage of every page that touches
-keys. LED colours glow between the caps and shine through the legends the way shine-through
-keycaps do. On the Screen page the view moves in until the real 240 × 135 panel fills the stage and
-its pixel grid shows; the animation plays on the keyboard's own screen, not in a generic preview
-box. That move is the one piece of motion the app spends; it follows the *Interface animations*
-setting.
+Every widget style reads **roles**, never a colour. The roles are Catppuccin's
+([style guide](https://github.com/catppuccin/catppuccin/blob/main/docs/style-guide.md)), so a theme
+is a table of them:
 
-## Colors
+| Role | Used for |
+|---|---|
+| `crust`, `mantle`, `base` | the sidebar, the stage behind the drawing, the page |
+| `surface0`–`surface2` | cards, inputs, raised controls, their hover |
+| `overlay0`, `overlay1` | hairlines, borders, the unconnected dot |
+| `subtext0`, `subtext1`, `text` | hints and captions, secondary text, text |
+| `accent` | primary buttons, the selected row of a list, the selected segment |
+| `on_accent` | text on an accent fill |
+| `accent_mark` | thin marks: focus, sliders, switches, the selected key's outline, the remap dot |
+| `success`, `warning`, `danger` | the link dot, banners, destructive buttons and error notices |
 
-- **Desk / case / plate / keycap:** four steps of the same graphite, so surfaces separate by tone
-  rather than by borders and shadows.
-- **Ink `#ECE7DF`:** warm legend white, 13:1 on the case.
-- **Ink-dim `#A39F98`:** labels and help text, 6.0:1 on the case.
-- **Amber `#FF8F1F`:** primary buttons, the selected effect, the active navigation item, focus
-  rings, slider fill. Text on amber uses `#1A1408` (7.7:1). Amber never decorates.
-- **Status:** green, yellow and red only for real state (connected, needs attention, failed).
+Two themes follow the two colourways of the AK980 V2:
 
-## Typography
+| | Graphite (dark) | Lavender (light) |
+|---|---|---|
+| page `base` | `#1B1C20` | `#F7F6FB` |
+| `text` | `#E2E2DE` | `#2C2847` |
+| `accent` | `#F2CF2E` (the yellow Esc, Enter and Space) | `#6F5CC9` (the lavender legends) |
+| keyboard | black case, light grey caps, graphite modifiers, yellow accent caps | white case, white caps with violet legends, lavender modifiers, sky-blue accent caps |
 
-The Ubuntu family throughout, chosen for legibility at small sizes on a dark ground and for its
-full Cyrillic: Bold for the title, Medium for section headings and key legends, Regular for text,
-Ubuntu Mono only where a reader scans data (hex colours, bytes, frame delays, percentages). Body
-text is 14 px, labels 13 px. If only Ubuntu Nerd Font is installed, it is used instead. Sentence
-case everywhere. The fonts are bundled for the AppImage and come from the system in packages.
+Catppuccin Latte, Frappé, Macchiato and Mocha come from the official palette with any of its 14
+accents. "As the system" picks Graphite or Lavender from the desktop's light or dark preference.
+
+## Contrast is computed, not hoped for
+
+- Text roles reach 4.5:1 against every ground they sit on (WCAG AA); where a flavour's subtext or
+  overlay falls short, it moves towards `text` just far enough.
+- A fill keeps the accent's own colour and takes whichever text reads on it at 4.5:1 (`base`, or the
+  darkest or lightest text). Only when none does (Latte's blue) is the fill shaded towards black, so
+  the hue stays.
+- `accent_mark` is the accent shaded until it reaches 3:1 against the page, for marks that are thin.
+- The stage under the drawing is at least 1.4:1 from the keyboard's case, and the case gets an
+  outline at 3:1 against the stage, so a black keyboard on a dark theme or a white one on a light
+  theme never melts into the page.
+
+`theme.rs` has tests for all of this, for every theme, accent and colourway.
+
+## The keyboard drawing
+
+Drawn from `ak980/data/layout.json` on a canvas. Caps have sides and a sculpted top; legends are
+printed (the AK980 V2 has opaque caps), characters large and words small, as on the real caps. LED
+light leaks out from under a cap in a thin rim. A selected key gets an outline in `accent_mark`, a
+remapped key a dot. In paint mode the left button paints and drags, the middle one clears, the right
+one picks a key's colour. The keyboard's colourway is chosen apart from the theme.
 
 ## Layout
 
-A navigation rail of keycap-shaped items on the left; a header with the keyboard's name, the active
-profile, the link state and the clock; the keyboard stage; the page's controls below it in columns
-separated by thin rules. Pages that do not need the keyboard (Macros, Profiles, Device) hide the
-stage. Columns never nest cards.
+A sidebar with the pages and the link state at its foot; a header with the page title, what runs on
+the keyboard right now and the profile; notices; then the page, which scrolls. Settings are rows in
+cards: the label (with a hint under it) on the left, the control on the right. Choices of a few
+options are segmented and wrap onto a second line when the window is narrow. The narrowest window is
+980 × 640; the screenshot test renders every page at that width in both languages
+(`AK980_SHOTS_WIDTH=980`).
 
-## Shapes and depth
+## Feedback
 
-Radius by role: keycap-like choices 7 px with a 3 px darker bottom edge (they read as keys), buttons
-6 px, inputs 5 px, the stage none. The only shadow is the one under the keyboard on the desk.
-
-## Components
-
-- *Primary button:* amber fill, dark text, one per area at most (Upload, Write, Send).
-- *Keycap grid:* choices that are keyboard things (effects, key actions) are drawn as keys.
-- *Toggle:* on/off settings; *Segmented:* 2–4 exclusive choices; *Slider row:* slider plus its value
-  in mono.
-- *Colour picker:* always visible on the lighting pages (plane, hue strip, hex, presets), as in the
-  vendor driver; a swatch that opens it elsewhere.
-- *Toast:* a short line in the header that names what happened ("Lighting applied").
-
-## Do's and don'ts
-
-- Do derive every new colour, size and radius from the tokens above.
-- Do write controls as actions ("Upload to the screen", "Write layer to keyboard") and keep the same
-  verb in the result ("Animation uploaded").
-- Do show state honestly: say when something needs the cable, the agent, or another package.
-- Don't use emoji, the stock icon sets or icons in tinted squares; the icons are drawn for this app.
-- Don't use the defaults this design refuses: purple gradients, a second accent colour, glass
-  panels, glow shadows, ALL-CAPS labels, decorative numbering, a lone neon accent on near-black.
+- Work on the keyboard runs on a thread of its own; the header says what runs.
+- Notices appear at the bottom: confirmations go after 6 seconds, errors stay until closed.
+- Deleting a profile or a macro, resetting a layer and clearing or filling the colours can be undone
+  from a banner above the page until the next change.
+- A screen upload is confirmed first, because the keyboard cannot give the old animation back.
+- Icon-only buttons have tooltips. Everything works with the mouse alone.
+- Agent notifications go through `notify-send`: a lost 2.4 GHz link, a battery at 20 % and 10 %.

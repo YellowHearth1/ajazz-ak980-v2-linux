@@ -5,31 +5,39 @@ Thanks for helping. Issues with what you saw on your own keyboard are as welcome
 ## Running from a checkout
 
 ```bash
-python -m ak980            # the window
-python -m ak980 --help     # the command line
-QT_QPA_PLATFORM=offscreen python -m pytest -q
-python -m pyflakes ak980 tests tools
+cargo run -p ak980-gui              # the window
+cargo run -p ak980 -- --help        # the command line
+cargo test --workspace              # unit tests, parity with the Python version, translations
+cargo clippy --all-targets -- -D warnings
+make screenshots                    # every page, both themes and languages, without a window
+cargo clean                         # target/ grows to gigabytes
 ```
 
-`AK980_PREVIEW_ONLY=1` renders everything but sends nothing to the keyboard; `make screenshots`
-uses it to regenerate `docs/screenshots` from a demo profile.
+Run heavy builds under `nice -n 19 ionice -c3` if your desktop is sensitive to load.
 
-After changing a page, run `make layout` (`tools/layout_audit.py`). It opens every page and editor
-in both languages at three window sizes and lists clipped text, widgets that stick out and pages
-that would need horizontal scrolling. `tests/test_layout.py` runs the same check at one size.
+The screenshot test also takes `AK980_SHOTS_PICK=page:theme[:colourway[:accent]]`,
+`AK980_SHOTS_LANG` and `AK980_SHOTS_WIDTH=980` (the narrowest window): look at a page you changed in
+both languages at that width before calling it done.
+
+`ak980/` holds the Python implementation of 0.0.1, which was verified on the keyboard. It stays as
+the reference: `make golden` records what it sends for a profile with every kind of setting into
+`crates/ak980-core/tests/golden.json`, and `tests/parity.rs` requires the Rust code to send the same
+bytes. A difference is a bug in the port, not in the reference.
 
 ## Layout of the code
 
 | Path | What it is |
 |---|---|
-| `ak980/hid.py` | hidraw enumeration, feature/output reports, the cross-process device lock |
-| `ak980/device.py` | the keyboard protocol (wired and dongle) |
-| `ak980/lcd.py`, `keymap.py`, `macro.py`, `lighting.py` | encoders for the screen, keys, macros, effects |
-| `ak980/effects.py`, `engine.py`, `audio.py`, `keyinput.py` | PC lighting effects and their inputs |
-| `ak980/config.py`, `profiles.py` | settings, profiles, sending a profile |
-| `ak980/agent.py`, `service.py`, `permissions.py` | background agent, init systems, udev rule |
-| `ak980/gui/` | the PyQt6 app; `theme.py` holds every design token |
-| `ak980/locale/` | translations |
+| `crates/ak980-core/src/hid.rs` | hidraw enumeration, feature/output reports, the cross-process device lock |
+| `crates/ak980-core/src/device.rs` | the keyboard protocol (wired and dongle) |
+| `lcd.rs`, `keymap.rs`, `macros.rs`, `lighting.rs` | encoders for the screen, keys, macros, effects |
+| `effects.rs`, `engine.rs`, `audio.rs`, `keyinput.rs` | PC lighting effects and their inputs |
+| `config.rs`, `profiles.rs` | settings, profiles, sending a profile |
+| `agent.rs`, `service.rs`, `permissions.rs` | background agent, init systems, udev rule |
+| `crates/ak980/` | the `ak980` command |
+| `crates/ak980-gui/` | the window (iced); `theme.rs` holds every design token |
+| `crates/ak980-core/locale/` | translations |
+| `ak980/data/` | layout, udev rule, init templates, fonts, icon (shared with 0.0.1) |
 | `packaging/` | PKGBUILD, AppImage, desktop entry, man page, completions |
 
 ## Rules for hardware tests
@@ -45,19 +53,20 @@ that would need horizontal scrolling. `tests/test_layout.py` runs the same check
 
 ## Translations
 
-Interface strings are English and go through `tr()` (`ak980/i18n.py`). A language is one file,
-`ak980/locale/<code>.py`, with a `MESSAGES` dict from the English string to the translation; plural
-forms are tuples. Add the language to `LANGUAGES` in `i18n.py`. `tests/test_i18n.py` fails when a
-string is missing or a placeholder differs.
+Interface strings are English and go through `tr()` / `tr!()` (`crates/ak980-core/src/i18n.rs`). A
+language is one JSON file, `crates/ak980-core/locale/<code>.json`, from the English string to the
+translation; plural forms are lists of three (one, few, many). Add the language to `LANGUAGES` in
+`i18n.rs`. `tests/i18n.rs` fails when a string the code translates is missing or a placeholder
+differs.
 
 ## Design
 
-Read `docs/DESIGN.md` before changing the interface. New colours, sizes and radii come from
-`ak980/gui/theme.py`; if a token is missing, add it there first.
+Read `docs/DESIGN.md` before changing the interface. Styles read colour roles, never colours; sizes
+and radii come from `crates/ak980-gui/src/theme.rs`. If a token is missing, add it there first.
 
 ## Releases
 
-1. Update the version in `ak980/__init__.py`, `packaging/arch/PKGBUILD` and the metainfo file, and
-   add a `CHANGELOG.md` entry.
+1. Update the version in `Cargo.toml`, `packaging/arch/PKGBUILD` and the metainfo file, and add a
+   `CHANGELOG.md` entry; a heading with "(pre-release)" publishes a pre-release.
 2. Tag `vX.Y.Z` and push the tag: GitHub Actions builds the AppImage and the source archive.
 3. Run `updpkgsums` in `packaging/arch` and regenerate `.SRCINFO` with `makepkg --printsrcinfo`.
