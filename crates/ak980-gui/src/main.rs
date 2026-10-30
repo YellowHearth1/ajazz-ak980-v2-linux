@@ -151,6 +151,8 @@ mod screenshots {
                 app.cfg.settings.theme = theme.into();
                 app.cfg.settings.colorway.clone_from(colorway);
                 app.cfg.settings.accent.clone_from(accent);
+                // AK980_SHOTS_MODEL=keys draws the AK980 without a screen
+                app.cfg.settings.keyboard_model = std::env::var("AK980_SHOTS_MODEL").unwrap_or_else(|_| "screen".into());
                 app.apply_theme();
                 app.page = page;
                 app.keys.draft = app.cfg.profile().keymap_top[&119].clone();

@@ -142,7 +142,7 @@ impl App {
         let cfg = Config::load();
         let system_dark = true;
         let s = &cfg.settings;
-        let theme = theme::activate(theme::roles_for(&s.theme, &s.accent, &s.colorway, system_dark));
+        let theme = theme::activate(theme::roles_for(&s.theme, &s.accent, &s.colorway, &s.keyboard_model, system_dark));
         let app = Self {
             config_mtime: config::mtime(&cfg.path),
             saved_at: None,
@@ -241,7 +241,7 @@ impl App {
 
     pub fn apply_theme(&mut self) {
         let s = &self.cfg.settings;
-        self.theme = theme::activate(theme::roles_for(&s.theme, &s.accent, &s.colorway, self.system_dark));
+        self.theme = theme::activate(theme::roles_for(&s.theme, &s.accent, &s.colorway, &s.keyboard_model, self.system_dark));
     }
 
     pub fn update(&mut self, message: Message) -> Task<Message> {
@@ -436,12 +436,48 @@ impl App {
             caption(tr("Software for Linux")),
         ]
         .spacing(2);
-        container(column![brand, nav, space().height(Fill), self.link_badge()].spacing(18))
+        let middle = scrollable(column![nav, self.looks()].spacing(22)).style(theme::scroll).height(Fill);
+        container(column![brand, middle, self.link_badge()].spacing(18))
             .padding([20, 12])
             .width(212)
             .height(Fill)
             .style(theme::sidebar)
             .into()
+    }
+
+    /// The look of the app and of the keyboard it draws, at hand on every page.
+    fn looks(&self) -> Element<'_, Message> {
+        use pages::device::Msg as D;
+        let s = &self.cfg.settings;
+        let choices = |table: &[(&'static str, &'static str)]| -> Vec<widgets::Choice<&'static str>> {
+            table.iter().map(|(id, name)| widgets::Choice::new(*id, tr(name))).collect()
+        };
+        let picker = |label: String, items: Vec<widgets::Choice<&'static str>>, current: &str,
+                      on: fn(&'static str) -> D| -> Element<'_, Message> {
+            let chosen = items.iter().find(|c| c.value == current).or(items.first()).cloned();
+            column![
+                caption(label),
+                pick_list(items, chosen, move |c| Message::Device(on(c.value))).style(theme::pick).menu_style(theme::menu)
+                    .text_size(theme::TEXT).padding([6, 10]).width(Fill),
+            ]
+            .spacing(4)
+            .into()
+        };
+        let mut col = column![
+            picker(tr("Theme"), choices(&theme::THEMES), &s.theme, D::Theme),
+            picker(tr("Keyboard colours"), choices(&theme::COLORWAYS), &s.colorway, D::Colorway),
+            picker(tr("Keyboard"), choices(&theme::MODELS), &s.keyboard_model, D::Model),
+        ]
+        .spacing(10);
+        if theme::is_catppuccin(&s.theme) {
+            col = col.push(column![caption(tr("Accent")), pages::device::accent_swatches(self)].spacing(4));
+        }
+        // Offered only when it would change something: a colourway is chosen and the theme differs
+        if theme::theme_for_colorway(&s.colorway).is_some_and(|t| t != s.theme) {
+            col = col.push(widgets::secondary_button(tr("Match the theme"), Some(Message::Device(D::MatchTheme)))
+                .width(Fill));
+        }
+        col.into()
     }
 
     fn link_badge(&self) -> Element<'_, Message> {

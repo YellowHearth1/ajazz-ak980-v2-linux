@@ -184,6 +184,9 @@ pub struct Settings {
     /// How the keyboard is drawn: "auto" (the colourway that suits the theme), "graphite" or
     /// "lavender".
     pub colorway: String,
+    /// Which AK980 the window draws: "screen" (the V2 with its screen and knob) or "keys" (Insert,
+    /// Print Screen, Scroll Lock and Pause in their place). The drawing only.
+    pub keyboard_model: String,
     /// Desktop notifications from the agent (battery, lost 2.4 GHz link).
     pub notifications: bool,
     /// Over any PC effect: Caps Lock and Num Lock light up while they are on.
@@ -216,6 +219,7 @@ impl Default for Settings {
             theme: "auto".into(),
             accent: "mauve".into(),
             colorway: "auto".into(),
+            keyboard_model: "screen".into(),
             notifications: true,
             overlay_locks: false,
             overlay_lock_color: [255, 255, 255],

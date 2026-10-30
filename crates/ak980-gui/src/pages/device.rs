@@ -13,7 +13,7 @@ use iced::{Alignment, Element, Fill, Task};
 use crate::app::{blocking, App, Message};
 use crate::fonts;
 use crate::theme;
-use crate::widgets::{self, caption, card, section, segmented, setting, Choice};
+use crate::widgets::{self, caption, card, section, setting, Choice};
 
 #[derive(Default)]
 pub struct State {
@@ -44,6 +44,8 @@ pub enum Msg {
     Theme(&'static str),
     Accent(&'static str),
     Colorway(&'static str),
+    /// Which AK980 the drawing shows.
+    Model(&'static str),
     /// The theme made from the keyboard's colourway.
     MatchTheme,
     Language(Choice<&'static str>),
@@ -151,6 +153,10 @@ pub fn update(app: &mut App, msg: Msg) -> Task<Message> {
         }
         Msg::Colorway(c) => {
             app.cfg.settings.colorway = c.to_string();
+            app.apply_theme();
+        }
+        Msg::Model(m) => {
+            app.cfg.settings.keyboard_model = m.to_string();
             app.apply_theme();
         }
         Msg::MatchTheme => {
@@ -286,37 +292,10 @@ pub fn view(app: &App) -> Element<'_, Message> {
         agent.push(setting(title, Some(tr(m.detail)), control));
     }
 
-    let themes: Vec<Choice<&'static str>> = theme::THEMES.iter().map(|(id, name)| Choice::new(*id, tr(name))).collect();
-    let current_theme = themes.iter().find(|c| c.value == s.theme).or(themes.first()).cloned();
-    let colorways: Vec<(&'static str, String)> = theme::COLORWAYS.iter().map(|(id, name)| (*id, tr(name))).collect();
-    let current_colorway = theme::COLORWAYS.iter().map(|(id, _)| *id).find(|c| *c == s.colorway).unwrap_or("auto");
-    // Offered only when it would change something: a colourway is chosen and the theme differs
-    let match_theme = theme::theme_for_colorway(&s.colorway)
-        .filter(|t| *t != s.theme)
-        .map(|_| widgets::secondary_button(tr("Match the theme"), Some(wrap(Msg::MatchTheme))));
     let mut langs: Vec<Choice<&'static str>> = vec![Choice::new("auto", tr("System language"))];
     langs.extend(LANGUAGES.iter().map(|(c, n)| Choice::new(*c, n.to_string())));
     let current_lang = langs.iter().find(|c| c.value == s.language).cloned();
-    let mut appearance = vec![setting(
-        tr("Theme"),
-        Some(tr("Graphite and Lavender follow the two colourways of the AK980 V2. Catppuccin comes in four flavours, \
-                 from light Latte to dark Mocha.")),
-        pick_list(themes, current_theme, |c| wrap(Msg::Theme(c.value))).style(theme::pick).menu_style(theme::menu)
-            .width(240),
-    )];
-    if theme::is_catppuccin(&s.theme) {
-        appearance.push(setting(tr("Accent"), None, accent_swatches(app)));
-    }
-    let mut keyboard_colours =
-        row![segmented(colorways, current_colorway, |c| wrap(Msg::Colorway(c)))].spacing(8).align_y(Alignment::Center);
-    if let Some(button) = match_theme {
-        keyboard_colours = keyboard_colours.push(button);
-    }
-    appearance.push(setting(
-        tr("Keyboard colours"),
-        Some(tr("How the keyboard on every page is coloured, apart from the theme.")),
-        keyboard_colours,
-    ));
+    let mut appearance: Vec<Element<'_, Message>> = vec![];
     appearance.extend([
         setting(tr("Language"), None, pick_list(langs, current_lang, |c| wrap(Msg::Language(c))).style(theme::pick)
             .menu_style(theme::menu).width(200)),
@@ -348,17 +327,18 @@ pub fn view(app: &App) -> Element<'_, Message> {
     .into()
 }
 
-/// Catppuccin's accents as swatches, each in the colour it will have in this flavour.
-fn accent_swatches(app: &App) -> Element<'_, Message> {
+/// Catppuccin's accents as swatches, each in the colour it will have in this flavour; they wrap
+/// onto as many rows as the sidebar needs.
+pub fn accent_swatches(app: &App) -> Element<'_, Message> {
     let s = &app.cfg.settings;
-    let mut swatches = row![].spacing(6);
+    let mut swatches = row![].spacing(5);
     for (id, name) in theme::ACCENTS {
-        let color = theme::roles_for(&s.theme, id, &s.colorway, app.system_dark).accent;
-        let chip = container(space()).width(22).height(22).style(theme::swatch(color, s.accent == id));
+        let color = theme::roles_for(&s.theme, id, &s.colorway, &s.keyboard_model, app.system_dark).accent;
+        let chip = container(space()).width(20).height(20).style(theme::swatch(color, s.accent == id));
         let pick = button(chip).padding(0).style(theme::flat).on_press(wrap(Msg::Accent(id)));
         swatches = swatches.push(widgets::hint(pick, tr(name)));
     }
-    swatches.into()
+    swatches.wrap().vertical_spacing(5).into()
 }
 
 /// How often the agent sets the clock on its own.

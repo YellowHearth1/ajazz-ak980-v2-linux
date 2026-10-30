@@ -69,14 +69,40 @@ fn key_at(size: Size, p: Point) -> Option<u8> {
         .map(|k| k.index)
 }
 
-/// Which caps carry the accent colour and which the modifier colour, as on both colourways.
-fn cap_kind(k: &LayoutKey) -> u8 {
+/// Which caps carry the accent colour and which the modifier colour, as on the AK980 colourways:
+/// some give the arrows the accent, some leave the numpad's Enter a modifier.
+fn cap_kind(k: &LayoutKey, c: &Colorway) -> u8 {
     match k.code {
-        0x29 | 0x28 | 0x2C | 0x58 => 2,                       // Esc, Enter, Space, numpad Enter
+        0x29 | 0x28 | 0x2C => 2,                              // Esc, Enter, Space
+        0x58 if c.accent_numpad_enter => 2,
+        0x4F..=0x52 if c.accent_arrows => 2,
         0x3E..=0x41 | 0x4C | 0x2A | 0x2B | 0x39 | 0xE0..=0xE7 | 0xAF | 0x4F..=0x52 | 0x4A | 0x4B | 0x4E
-        | 0x53..=0x57 => 1,                                   // F5–F8, editing, modifiers, arrows, numpad ops
+        | 0x53..=0x58 | 0x46..=0x49 => 1,                     // F5–F8, editing, modifiers, arrows, numpad ops
         _ => 0,
     }
+}
+
+/// A cap of a colourway whose caps fade from the top row to the bottom one: its colour, side and
+/// legend at height `y` (layout units). The legends are printed in a shade of the cap, faintly.
+fn faded_cap(stops: [Color; 3], y: f32) -> (Color, Color, Color) {
+    let t = ((y - 40.0) / (238.0 - 40.0)).clamp(0.0, 1.0);
+    let cap = if t < 0.5 { mix(stops[0], stops[1], t * 2.0) } else { mix(stops[1], stops[2], t * 2.0 - 1.0) };
+    let legend = if theme::luminance(cap) > 0.2 { mix(cap, Color::BLACK, 0.45) } else { mix(cap, Color::WHITE, 0.4) };
+    (cap, mix(cap, Color::BLACK, 0.22), legend)
+}
+
+/// The four keys of the AK980 without a screen, where the V2 has its screen and knob. They are
+/// only drawn: the AK980 V2 this app talks to has no such keys, so they take no light or clicks.
+fn keys_instead_of_screen() -> &'static [LayoutKey] {
+    static KEYS: std::sync::OnceLock<Vec<LayoutKey>> = std::sync::OnceLock::new();
+    KEYS.get_or_init(|| {
+        [("Insert", 0x49), ("Print", 0x46), ("Scroll", 0x47), ("Pause", 0x48)]
+            .iter()
+            .enumerate()
+            .map(|(i, (label, code))| LayoutKey { label: label.to_string(), index: 0, code: *code, x: 630 + 37 * i as i32,
+                                                  y: 40, w: 34, h: 33 })
+            .collect()
+    })
 }
 
 const SHIFTED: &str = "~!@#$%^&*()_+{}|:\"<>?";
@@ -169,27 +195,33 @@ impl<Message> canvas::Program<Message> for Keyboard<'_, Message> {
         // An outline that stands off the stage, so the case never melts into the page
         frame.stroke(&case, Stroke::default().with_color(theme::case_outline(&r)).with_width(1.5));
 
-        // The screen and the knob above the numpad
-        let (sx, sy, sw, sh) = SCREEN_RECT;
-        let screen = Path::rounded_rectangle(at(sx, sy), Size::new(sw * s, sh * s), (3.0 * s).into());
-        frame.fill(&screen, Color::from_rgb8(6, 6, 7));
-        frame.stroke(&screen, Stroke::default().with_color(k.case_edge).with_width(1.0));
-        frame.fill_text(Text {
-            content: self.clock.clone(),
-            position: at(sx + sw / 2.0, sy + sh / 2.0),
-            color: Color::from_rgb8(236, 236, 230),
-            size: Pixels(13.0 * s),
-            font: fonts::MEDIUM,
-            align_x: iced::widget::text::Alignment::Center,
-            align_y: alignment::Vertical::Center,
-            ..Text::default()
-        });
-        let knob = Path::circle(at(KNOB_CENTER.0, KNOB_CENTER.1), KNOB_RADIUS * s);
-        frame.fill(&knob, k.knob);
-        frame.stroke(&knob, Stroke::default().with_color(mix(k.knob, k.case_edge, 0.6)).with_width(1.5 * s));
-        let grip = Path::circle(at(KNOB_CENTER.0, KNOB_CENTER.1), KNOB_RADIUS * s * 0.72);
-        frame.stroke(&grip, Stroke::default().with_color(theme::alpha(k.case_edge, 0.8)).with_width(1.0));
+        if r.screen {
+            // The screen and the knob above the numpad
+            let (sx, sy, sw, sh) = SCREEN_RECT;
+            let screen = Path::rounded_rectangle(at(sx, sy), Size::new(sw * s, sh * s), (3.0 * s).into());
+            frame.fill(&screen, Color::from_rgb8(6, 6, 7));
+            frame.stroke(&screen, Stroke::default().with_color(k.case_edge).with_width(1.0));
+            frame.fill_text(Text {
+                content: self.clock.clone(),
+                position: at(sx + sw / 2.0, sy + sh / 2.0),
+                color: Color::from_rgb8(236, 236, 230),
+                size: Pixels(13.0 * s),
+                font: fonts::MEDIUM,
+                align_x: iced::widget::text::Alignment::Center,
+                align_y: alignment::Vertical::Center,
+                ..Text::default()
+            });
+            let knob = Path::circle(at(KNOB_CENTER.0, KNOB_CENTER.1), KNOB_RADIUS * s);
+            frame.fill(&knob, k.knob);
+            frame.stroke(&knob, Stroke::default().with_color(mix(k.knob, k.case_edge, 0.6)).with_width(1.5 * s));
+            let grip = Path::circle(at(KNOB_CENTER.0, KNOB_CENTER.1), KNOB_RADIUS * s * 0.72);
+            frame.stroke(&grip, Stroke::default().with_color(theme::alpha(k.case_edge, 0.8)).with_width(1.0));
 
+        } else {
+            for key in keys_instead_of_screen() {
+                self.draw_key(&mut frame, key, &k, s, o, false);
+            }
+        }
         for key in layout::keys() {
             self.draw_key(&mut frame, key, &k, s, o, state.hovered == Some(key.index));
         }
@@ -202,10 +234,11 @@ impl<Message> Keyboard<'_, Message> {
         let r = theme::roles();
         let (x, y) = (o.x + key.x as f32 * s, o.y + key.y as f32 * s);
         let (w, h) = (key.w as f32 * s, key.h as f32 * s);
-        let (cap, side, legend) = match cap_kind(key) {
-            2 => (k.accent, k.accent_side, k.accent_legend),
-            1 => (k.modifier, k.modifier_side, k.modifier_legend),
-            _ => (k.alpha, k.alpha_side, k.alpha_legend),
+        let (cap, side, legend) = match (k.gradient, cap_kind(key, k)) {
+            (Some(stops), _) => faded_cap(stops, key.y as f32),
+            (None, 2) => (k.accent, k.accent_side, k.accent_legend),
+            (None, 1) => (k.modifier, k.modifier_side, k.modifier_legend),
+            (None, _) => (k.alpha, k.alpha_side, k.alpha_legend),
         };
         let led = self.leds.get(&key.index).copied().filter(|c| led_on(*c));
 
@@ -292,8 +325,12 @@ mod tests {
 
     #[test]
     fn caps_follow_the_colourway() {
-        let kind = |n: &str| cap_kind(layout::find_key(n).unwrap());
+        let kind = |n: &str| cap_kind(layout::find_key(n).unwrap(), &theme::GRAPHITE_KEYS);
         assert_eq!((kind("esc"), kind("space"), kind("enter")), (2, 2, 2));
+        let numpad_enter = layout::by_code(0x58).unwrap();
+        assert_eq!((cap_kind(numpad_enter, &theme::GRAPHITE_KEYS), cap_kind(numpad_enter, &theme::MINT_KEYS)), (2, 1));
+        let up = layout::find_key("Up").unwrap();
+        assert_eq!((cap_kind(up, &theme::GRAPHITE_KEYS), cap_kind(up, &theme::FROST_KEYS)), (1, 2));
         assert_eq!((kind("F5"), kind("LeftShift"), kind("Up")), (1, 1, 1));
         assert_eq!((kind("A"), kind("F1"), kind("Num7")), (0, 0, 0));
     }

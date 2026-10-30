@@ -1,8 +1,11 @@
-//! The looks of the app: two taken from the two colourways of the AK980 V2, and Catppuccin's four.
+//! The looks of the app: five taken from colourways of the AK980, and Catppuccin's four.
 //!
 //! *Graphite* is the black case with light-grey and graphite caps and yellow Esc, Enter and space
 //! bar; *Lavender* the white case with white and lavender caps and sky-blue Esc, Enter and space
-//! bar. Colours have roles as in Catppuccin's style guide: `crust`, `mantle` and `base` are the
+//! bar; *Mint* the black case with white letters, black modifiers and mint Esc, Enter and space bar;
+//! *Dusk* the black case with caps that fade from black at the top through grey to pink at the
+//! bottom; *Frost* the white case with white letters, light blue-grey modifiers and dark slate Esc,
+//! Enter, space bar and arrows. Colours have roles as in Catppuccin's style guide: `crust`, `mantle` and `base` are the
 //! grounds from the outermost in, `surface0..2` raised things, `overlay0..2` borders and quiet
 //! marks, `text`, `subtext1` and `subtext0` the type, and text on the accent is `base`. Every
 //! widget style below reads these roles and nothing else, so a colour cannot drift per widget.
@@ -37,6 +40,13 @@ pub struct Colorway {
     pub accent_side: Color,
     pub accent_legend: Color,
     pub knob: Color,
+    /// Caps that fade from the top row to the bottom one (top, middle, bottom) instead of the three
+    /// kinds of cap.
+    pub gradient: Option<[Color; 3]>,
+    /// The arrows wear the accent too.
+    pub accent_arrows: bool,
+    /// The numpad's Enter wears the accent; otherwise it is a modifier.
+    pub accent_numpad_enter: bool,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -66,6 +76,8 @@ pub struct Roles {
     pub warning: Color,
     pub danger: Color,
     pub keyboard: Colorway,
+    /// The keyboard drawn has the screen and the knob; otherwise Insert, Print, Scroll and Pause.
+    pub screen: bool,
 }
 
 const fn hex(v: u32) -> Color {
@@ -86,6 +98,9 @@ pub const GRAPHITE_KEYS: Colorway = Colorway {
     accent_side: hex(0xCFAF18),
     accent_legend: hex(0x1B1B1D),
     knob: hex(0x1C1C1F),
+    gradient: None,
+    accent_arrows: false,
+    accent_numpad_enter: true,
 };
 
 /// The white AK980 V2: white letters with lavender legends, lavender modifiers, sky-blue accents.
@@ -102,6 +117,67 @@ pub const LAVENDER_KEYS: Colorway = Colorway {
     accent_side: hex(0x93B8D3),
     accent_legend: hex(0xFFFFFF),
     knob: hex(0xF2F2F5),
+    gradient: None,
+    accent_arrows: false,
+    accent_numpad_enter: true,
+};
+
+/// The black AK980 with white letters, black modifiers and mint Esc, Enter and space bar.
+pub const MINT_KEYS: Colorway = Colorway {
+    case: hex(0x1D1E20),
+    case_edge: hex(0x34363A),
+    alpha: hex(0xF1F1EE),
+    alpha_side: hex(0xCFCFCB),
+    alpha_legend: hex(0x1B1B1D),
+    modifier: hex(0x2B2C2F),
+    modifier_side: hex(0x1F2022),
+    modifier_legend: hex(0xEDEDEA),
+    accent: hex(0x93D3B8),
+    accent_side: hex(0x73B89B),
+    accent_legend: hex(0xFFFFFF),
+    knob: hex(0x202123),
+    gradient: None,
+    accent_arrows: false,
+    accent_numpad_enter: false,
+};
+
+/// The black AK980 whose caps fade from black at the top through grey to pink at the bottom.
+pub const DUSK_KEYS: Colorway = Colorway {
+    case: hex(0x1A191C),
+    case_edge: hex(0x33303A),
+    alpha: hex(0x6F6878),
+    alpha_side: hex(0x564F5E),
+    alpha_legend: hex(0x2E2A33),
+    modifier: hex(0x6F6878),
+    modifier_side: hex(0x564F5E),
+    modifier_legend: hex(0x2E2A33),
+    accent: hex(0xF3BAC4),
+    accent_side: hex(0xD99AA6),
+    accent_legend: hex(0xC98E9A),
+    knob: hex(0x1E1C20),
+    gradient: Some([hex(0x2B292E), hex(0x766E7E), hex(0xF5BCC6)]),
+    accent_arrows: false,
+    accent_numpad_enter: true,
+};
+
+/// The white AK980 with white letters, light blue-grey modifiers and dark slate Esc, Enter, space
+/// bar, arrows and numpad Enter.
+pub const FROST_KEYS: Colorway = Colorway {
+    case: hex(0xF3F4F6),
+    case_edge: hex(0xD8DCE2),
+    alpha: hex(0xFCFCFC),
+    alpha_side: hex(0xE1E4E9),
+    alpha_legend: hex(0x2B2E36),
+    modifier: hex(0xCADCE8),
+    modifier_side: hex(0xA9C2D3),
+    modifier_legend: hex(0x2B2E36),
+    accent: hex(0x4B5160),
+    accent_side: hex(0x383D49),
+    accent_legend: hex(0xF4F6F8),
+    knob: hex(0xF0F1F3),
+    gradient: None,
+    accent_arrows: true,
+    accent_numpad_enter: true,
 };
 
 /// WCAG relative luminance of an opaque colour.
@@ -147,6 +223,7 @@ pub const GRAPHITE: Roles = Roles {
     warning: hex(0xF0A35A),
     danger: hex(0xF07167),
     keyboard: GRAPHITE_KEYS,
+    screen: true,
 };
 
 pub const LAVENDER: Roles = Roles {
@@ -171,6 +248,82 @@ pub const LAVENDER: Roles = Roles {
     warning: hex(0xA86200),
     danger: hex(0xC4364C),
     keyboard: LAVENDER_KEYS,
+    screen: true,
+};
+
+pub const MINT: Roles = Roles {
+    name: "mint",
+    dark: true,
+    crust: hex(0x0E0F10),
+    mantle: hex(0x141517),
+    base: hex(0x191B1D),
+    surface0: hex(0x222427),
+    surface1: hex(0x2C2F33),
+    surface2: hex(0x383C41),
+    overlay0: hex(0x50555B),
+    overlay1: hex(0x7C8288),
+    subtext0: hex(0xA9AEB2),
+    subtext1: hex(0xC4C8CB),
+    text: hex(0xE8EAE8),
+    accent: hex(0x8FD3B6),
+    on_accent: hex(0x191B1D),
+    accent_mark: hex(0x8FD3B6),
+    second: hex(0xF1F1EE),
+    success: hex(0x8FCF7A),
+    warning: hex(0xF0A35A),
+    danger: hex(0xF07167),
+    keyboard: MINT_KEYS,
+    screen: true,
+};
+
+pub const DUSK: Roles = Roles {
+    name: "dusk",
+    dark: true,
+    crust: hex(0x121014),
+    mantle: hex(0x18151A),
+    base: hex(0x1E1A20),
+    surface0: hex(0x28232B),
+    surface1: hex(0x322C36),
+    surface2: hex(0x3E3743),
+    overlay0: hex(0x59505F),
+    overlay1: hex(0x86798C),
+    subtext0: hex(0xB3A6B5),
+    subtext1: hex(0xCBBFCB),
+    text: hex(0xF0E6EB),
+    accent: hex(0xF2A9B8),
+    on_accent: hex(0x1E1A20),
+    accent_mark: hex(0xF2A9B8),
+    second: hex(0x766E7E),
+    success: hex(0x9AD08A),
+    warning: hex(0xF2B266),
+    danger: hex(0xF47A7A),
+    keyboard: DUSK_KEYS,
+    screen: true,
+};
+
+pub const FROST: Roles = Roles {
+    name: "frost",
+    dark: false,
+    crust: hex(0xE2E8EE),
+    mantle: hex(0xECF0F4),
+    base: hex(0xF5F7FA),
+    surface0: hex(0xFFFFFF),
+    surface1: hex(0xEDF2F6),
+    surface2: hex(0xDFE7EE),
+    overlay0: hex(0xB7C4CF),
+    overlay1: hex(0x6E7C89),
+    subtext0: hex(0x4D5966),
+    subtext1: hex(0x3D4854),
+    text: hex(0x222932),
+    accent: hex(0x4A5363),
+    on_accent: hex(0xF5F7FA),
+    accent_mark: hex(0x4A5363),
+    second: hex(0xCADCE8),
+    success: hex(0x2E7D4F),
+    warning: hex(0x9A5B00),
+    danger: hex(0xC0392B),
+    keyboard: FROST_KEYS,
+    screen: true,
 };
 
 /// A Catppuccin flavour: the 14 accents in `ACCENTS` order, then text, subtext1, subtext0,
@@ -235,6 +388,7 @@ fn catppuccin(f: &Flavour, accent: &str) -> Roles {
         warning: c(6),
         danger: c(4),
         keyboard: if f.dark { GRAPHITE_KEYS } else { LAVENDER_KEYS },
+        screen: true,
     };
     if !f.dark {
         // Latte: cards brighter than the page, as in Lavender; Latte's own surfaces become the controls
@@ -270,49 +424,56 @@ fn catppuccin(f: &Flavour, accent: &str) -> Roles {
 
 /// The themes in the order the window offers them; "auto" follows the system's light or dark
 /// preference.
-pub const THEMES: [(&str, &str); 7] = [
+pub const THEMES: [(&str, &str); 10] = [
     ("auto", "As the system"),
     ("graphite", "Graphite"),
     ("lavender", "Lavender"),
+    ("mint", "Mint"),
+    ("dusk", "Dusk"),
+    ("frost", "Frost"),
     ("latte", "Catppuccin Latte"),
     ("frappe", "Catppuccin Frappé"),
     ("macchiato", "Catppuccin Macchiato"),
     ("mocha", "Catppuccin Mocha"),
 ];
 
-/// How the keyboard is drawn: the colourway that suits the theme, or one of the AK980 V2's two.
-pub const COLORWAYS: [(&str, &str); 3] = [("auto", "As the theme"), ("graphite", "Graphite"), ("lavender", "Lavender")];
+/// How the keyboard is drawn: the colourway that suits the theme, or one of the AK980's.
+pub const COLORWAYS: [(&str, &str); 6] = [("auto", "As the theme"), ("graphite", "Graphite"), ("lavender", "Lavender"),
+                                          ("mint", "Mint"), ("dusk", "Dusk"), ("frost", "Frost")];
+
+/// Which AK980 is drawn: the V2 with its screen and knob, or the one with Insert, Print Screen,
+/// Scroll Lock and Pause in their place (only the drawing changes).
+pub const MODELS: [(&str, &str); 2] = [("screen", "Screen and knob"), ("keys", "Insert … Pause keys")];
+
+/// The themes made from a colourway, which keep it under "As the theme".
+const OWN: [(&str, Roles); 5] = [("graphite", GRAPHITE), ("lavender", LAVENDER), ("mint", MINT), ("dusk", DUSK),
+                                 ("frost", FROST)];
 
 pub fn is_catppuccin(theme: &str) -> bool {
     FLAVOURS.iter().any(|f| f.id == theme)
 }
 
-pub fn roles_for(theme: &str, accent: &str, colorway: &str, system_dark: bool) -> Roles {
-    let mut r = match theme {
-        "graphite" => GRAPHITE,
-        "lavender" => LAVENDER,
-        id => match FLAVOURS.iter().find(|f| f.id == id) {
+pub fn roles_for(theme: &str, accent: &str, colorway: &str, model: &str, system_dark: bool) -> Roles {
+    let mut r = match OWN.iter().find(|(id, _)| *id == theme) {
+        Some((_, own)) => *own,
+        None => match FLAVOURS.iter().find(|f| f.id == theme) {
             Some(f) => catppuccin(f, accent),
             None if system_dark => GRAPHITE,
             None => LAVENDER,
         },
     };
-    r.keyboard = match colorway {
-        "graphite" => GRAPHITE_KEYS,
-        "lavender" => LAVENDER_KEYS,
-        _ if r.dark => GRAPHITE_KEYS,
-        _ => LAVENDER_KEYS,
-    };
+    if let Some((_, own)) = OWN.iter().find(|(id, _)| *id == colorway) {
+        r.keyboard = own.keyboard;
+    } else if !OWN.iter().any(|(_, own)| own.name == r.name) {
+        r.keyboard = if r.dark { GRAPHITE_KEYS } else { LAVENDER_KEYS };
+    }
+    r.screen = model != "keys";
     r
 }
 
 /// The theme made from a keyboard colourway, for "Match the theme to the keyboard".
 pub fn theme_for_colorway(colorway: &str) -> Option<&'static str> {
-    match colorway {
-        "graphite" => Some("graphite"),
-        "lavender" => Some("lavender"),
-        _ => None,
-    }
+    OWN.iter().find(|(id, _)| *id == colorway).map(|(id, _)| *id)
 }
 
 /// How far the case's colour must stand off the stage for the case to read as a shape.
@@ -729,7 +890,7 @@ mod tests {
 
     #[test]
     fn text_is_readable_in_both_themes() {
-        for r in [GRAPHITE, LAVENDER] {
+        for r in OWN.map(|(_, r)| r) {
             for (ground, gname) in [(r.base, "base"), (r.surface0, "surface0"), (r.mantle, "mantle"), (r.surface1, "surface1")] {
                 // WCAG AA: 4.5:1 for text, 3:1 for quiet marks and large text
                 assert!(contrast(r.text, ground) >= 7.0, "{} text on {gname}: {}", r.name, contrast(r.text, ground));
@@ -750,9 +911,9 @@ mod tests {
 
     /// Every theme the window offers, with every accent a Catppuccin flavour can take.
     fn every_theme() -> Vec<Roles> {
-        let mut all = vec![GRAPHITE, LAVENDER];
+        let mut all: Vec<Roles> = OWN.iter().map(|(_, r)| *r).collect();
         for f in &FLAVOURS {
-            all.extend(ACCENTS.iter().map(|(a, _)| roles_for(f.id, a, "auto", true)));
+            all.extend(ACCENTS.iter().map(|(a, _)| roles_for(f.id, a, "auto", "screen", true)));
         }
         all
     }
@@ -782,24 +943,24 @@ mod tests {
     #[test]
     fn catppuccin_keeps_its_colours_where_it_can() {
         // Mocha needs no change, so its colours are the palette's own
-        let mocha = roles_for("mocha", "mauve", "auto", true);
+        let mocha = roles_for("mocha", "mauve", "auto", "screen", true);
         assert_eq!((mocha.accent, mocha.text, mocha.base), (hex(0xcba6f7), hex(0xcdd6f4), hex(0x1e1e2e)));
         // Latte's yellow keeps its colour as a fill and gets dark text; its marks are a darker yellow
-        let latte = roles_for("latte", "yellow", "auto", false);
+        let latte = roles_for("latte", "yellow", "auto", "screen", false);
         assert_eq!(latte.accent, hex(0xdf8e1d));
         assert!(luminance(latte.on_accent) < luminance(latte.accent) && luminance(latte.accent_mark) < luminance(latte.accent));
         assert!(latte.accent_mark.r > latte.accent_mark.b, "the mark keeps the hue: {:?}", latte.accent_mark);
         // Latte's blue reads under neither white nor black at 4.5:1, so only that fill is darkened
-        let blue = roles_for("latte", "blue", "auto", false);
+        let blue = roles_for("latte", "blue", "auto", "screen", false);
         assert!(luminance(blue.accent) < luminance(hex(0x1e66f5)) && blue.accent.b > blue.accent.r);
-        assert!(!latte.dark && roles_for("latte", "nonsense", "auto", false).accent != Color::BLACK);
+        assert!(!latte.dark && roles_for("latte", "nonsense", "auto", "screen", false).accent != Color::BLACK);
     }
 
     #[test]
     fn the_keyboard_stands_out_on_every_theme() {
         for theme in THEMES.iter().map(|(t, _)| *t).filter(|t| *t != "auto") {
             for (colorway, _) in COLORWAYS {
-                let r = roles_for(theme, "mauve", colorway, true);
+                let r = roles_for(theme, "mauve", colorway, "screen", true);
                 let ground = stage_ground(&r);
                 assert!(contrast(r.keyboard.case, ground) >= STAGE_SEPARATION, "{theme}/{colorway}: case on stage {:.2}",
                         contrast(r.keyboard.case, ground));
@@ -808,15 +969,18 @@ mod tests {
             }
         }
         // "As the theme" keeps the pairing the two own themes were made with
-        assert_eq!(roles_for("graphite", "mauve", "auto", true).keyboard.case, GRAPHITE_KEYS.case);
-        assert_eq!(roles_for("latte", "mauve", "auto", false).keyboard.case, LAVENDER_KEYS.case);
+        assert_eq!(roles_for("graphite", "mauve", "auto", "screen", true).keyboard.case, GRAPHITE_KEYS.case);
+        assert_eq!(roles_for("latte", "mauve", "auto", "screen", false).keyboard.case, LAVENDER_KEYS.case);
+        assert_eq!(roles_for("dusk", "mauve", "auto", "screen", true).keyboard.case, DUSK_KEYS.case);
+        assert_eq!(roles_for("frost", "mauve", "mint", "keys", true).keyboard.case, MINT_KEYS.case);
+        assert!(!roles_for("frost", "mauve", "mint", "keys", true).screen);
     }
 
     #[test]
     fn every_label_is_translated() {
         // These tables are translated where they are shown, so the source scan in ak980-core misses them
         let uk = ak980_core::i18n::catalog("uk").expect("the Ukrainian catalog");
-        for (_, label) in THEMES.iter().chain(&COLORWAYS).chain(&ACCENTS) {
+        for (_, label) in THEMES.iter().chain(&COLORWAYS).chain(&ACCENTS).chain(&MODELS) {
             assert!(uk.contains_key(*label), "{label:?} has no Ukrainian translation");
         }
     }
