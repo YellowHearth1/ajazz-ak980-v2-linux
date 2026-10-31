@@ -15,7 +15,7 @@ use log::warn;
 
 use crate::audio::AudioMeter;
 use crate::config::{self, Config, LightSource, Profile, Settings};
-use crate::device::WiredKeyboard;
+use crate::device::{Calibration, WiredKeyboard};
 use crate::effects::{Effect, Inputs, Rgbf, attention, create, mix, to_bytes};
 use crate::keyinput::KeyListener;
 use crate::layout::{by_code, positions};
@@ -31,6 +31,30 @@ pub enum Status {
     Streaming,
     NoCable,
     Error,
+}
+
+/// While the window shows a test colour on every key (the LED colours page), PC effects send no
+/// frames, or they would cover it at once. The window keeps this file fresh; one older than
+/// `HOLD_FRESH`, left by a window that went away, no longer holds them.
+pub fn hold_file() -> PathBuf {
+    crate::runtime::runtime_dir().join("ak980-lighting-hold")
+}
+
+const HOLD_FRESH: Duration = Duration::from_secs(6);
+
+/// Holds PC effects (`true`, again every few seconds while needed) or lets them go on.
+pub fn hold_lighting(on: bool) {
+    let path = hold_file();
+    if !on {
+        let _ = std::fs::remove_file(&path);
+    } else if let Err(e) = std::fs::write(&path, b"") {
+        warn!("cannot hold the PC effects: {e}");
+    }
+}
+
+fn held() -> bool {
+    std::fs::metadata(hold_file()).and_then(|m| m.modified()).ok().and_then(|t| t.elapsed().ok())
+        .is_some_and(|age| age < HOLD_FRESH)
 }
 
 /// Receives every frame, already scaled by the profile's brightness, for the on-screen keyboard.
@@ -158,6 +182,8 @@ struct Device {
     drive: bool,
     kb: Option<WiredKeyboard>,
     next_open: Instant,
+    /// The colour calibration from this engine's config, for the keyboard it opens.
+    calibration: Calibration,
 }
 
 impl Device {
@@ -169,7 +195,10 @@ impl Device {
             self.next_open = Instant::now() + Duration::from_secs(2);
             if let Some((cmd, lcd)) = WiredKeyboard::find() {
                 match WiredKeyboard::open_found(&cmd, lcd.as_ref()) {
-                    Ok(kb) => self.kb = Some(kb),
+                    Ok(mut kb) => {
+                        kb.calibration = self.calibration;
+                        self.kb = Some(kb);
+                    }
                     Err(e) => warn!("cannot open the keyboard: {e}"),
                 }
             }
@@ -296,9 +325,12 @@ impl Sources {
 fn run(shared: Arc<Shared>, sink: Option<FrameSink>, path: PathBuf, drive: bool) {
     let (leds, pos) = positions();
     let mut cfg = Config::load_from(&path);
-    crate::device::set_calibration(cfg.settings.calibration());
+    // The calibration this engine's keyboard uses. Compared with this and not with the process-wide
+    // one, which the window or the agent may have set already before this sees the file
+    let mut applied = cfg.settings.calibration();
+    crate::device::set_calibration(applied);
     let mut seen: Option<SystemTime> = config::mtime(&path);
-    let mut device = Device { drive, kb: None, next_open: Instant::now() };
+    let mut device = Device { drive, kb: None, next_open: Instant::now(), calibration: applied };
     let mut inputs = Sources { keys: None, audio: AudioMeter::new(), system: SystemReadings::default(),
                              overlays: Overlays::default() };
     let mut effect: Option<Box<dyn Effect>> = None;
@@ -308,19 +340,30 @@ fn run(shared: Arc<Shared>, sink: Option<FrameSink>, path: PathBuf, drive: bool)
     let mut next_check = Instant::now();
     let set_status = |s: Status| *shared.status.lock().unwrap() = s;
 
+    let mut hold = false;
     while !shared.stop.load(Ordering::Relaxed) {
         let now = Instant::now();
         if now >= next_check {
             next_check = now + Duration::from_millis(250);
+            hold = held();
             let m = config::mtime(&path);
             if m != seen {
                 seen = m;
                 cfg = Config::load_from(&path);
-                if crate::device::calibration() != cfg.settings.calibration() {
-                    crate::device::set_calibration(cfg.settings.calibration());
-                    device.drop_device(); // opened again with the new balance
+                if cfg.settings.calibration() != applied {
+                    applied = cfg.settings.calibration();
+                    crate::device::set_calibration(applied);
+                    device.calibration = applied;
+                    if let Some(kb) = device.kb.as_mut() {
+                        kb.calibration = applied; // the next frame already comes out the new way
+                    }
                 }
             }
+        }
+        if hold {
+            // The window shows a test colour; the effect goes on where it is once that is over
+            wait(&shared.stop, Duration::from_millis(100));
+            continue;
         }
         let profile = shared.preview.lock().unwrap().clone().unwrap_or_else(|| cfg.profile().clone());
         let alert = shared.alert.lock().unwrap().clone();

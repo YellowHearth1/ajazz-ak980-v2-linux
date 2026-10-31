@@ -257,20 +257,24 @@ impl App {
     pub fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::Navigate(page) => {
-                let restore = (self.page == Page::Calibration && page != Page::Calibration && self.calibration.showing)
-                    .then(|| pages::calibration::give_lighting_back(self));
+                let restore = if self.page == Page::Calibration && page != Page::Calibration && self.calibration.showing {
+                    pages::calibration::give_lighting_back(self)
+                } else {
+                    Task::none()
+                };
                 self.page = page;
-                if let Some(task) = restore {
-                    return task;
-                }
-                match page {
+                let load = match page {
                     Page::Device => pages::device::refresh(),
                     Page::Battery => pages::battery::load(),
                     _ => Task::none(),
-                }
+                };
+                Task::batch([restore, load])
             }
             Message::Poll => {
                 self.save_if_due();
+                if self.calibration.showing {
+                    ak980_core::engine::hold_lighting(true); // kept fresh, or PC effects go on
+                }
                 let read = self.battery_at.is_none_or(|t| t.elapsed() > Duration::from_secs(60));
                 // Errors stay until they are closed, so one is never missed; the rest go after 6 s
                 self.toasts.retain(|t| t.error || t.at.elapsed() < Duration::from_secs(6));
@@ -327,6 +331,8 @@ impl App {
                 if self.unsaved {
                     self.save_now();
                 }
+                // Keys left in the LED colours test colour get the profile's lighting back
+                pages::calibration::give_lighting_back_now(self);
                 iced::exit()
             }
             Message::Done(result) => {
@@ -407,7 +413,9 @@ impl App {
             pages::macros::subscription(self),
         ];
         if pages::lighting::animating(self) || pages::screen::animating(self) {
-            subs.push(iced::time::every(Duration::from_millis(33)).map(Message::Tick));
+            // The typing shown for "Single on" and "Single off" looks the same at half the rate
+            let typing_only = pages::lighting::typing_preview(self) && !pages::screen::animating(self);
+            subs.push(iced::time::every(Duration::from_millis(if typing_only { 66 } else { 33 })).map(Message::Tick));
         }
         Subscription::batch(subs)
     }

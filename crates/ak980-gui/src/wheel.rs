@@ -21,6 +21,8 @@ pub struct Wheel<'a, Message> {
 pub struct State {
     cache: Cache,
     dragging: bool,
+    /// The rim's colour in the cached drawing: another theme draws the wheel again.
+    rim: std::cell::Cell<Option<Color>>,
 }
 
 fn rgb(h: f32, s: f32, v: f32) -> Color {
@@ -89,7 +91,11 @@ impl<Message> canvas::Program<Message> for Wheel<'_, Message> {
 
     fn draw(&self, state: &State, renderer: &Renderer, _theme: &Theme, bounds: Rectangle, _cursor: Cursor) -> Vec<Geometry> {
         let (c, r) = geometry(bounds.size());
-        // The wheel itself never changes, only the marker on it
+        let rim = theme::alpha(theme::roles().overlay1, 0.8);
+        if state.rim.replace(Some(rim)) != Some(rim) {
+            state.cache.clear();
+        }
+        // The wheel itself changes only with the theme, the marker on it with every pick
         let wheel = state.cache.draw(renderer, bounds.size(), |frame| {
             let step = std::f32::consts::TAU / SEGMENTS as f32;
             for ring in 0..RINGS {
@@ -109,8 +115,7 @@ impl<Message> canvas::Program<Message> for Wheel<'_, Message> {
                     frame.fill(&piece, rgb((seg as f32 + 0.5) * 360.0 / SEGMENTS as f32, s, 1.0));
                 }
             }
-            frame.stroke(&Path::circle(c, r), Stroke::default().with_color(theme::alpha(theme::roles().overlay1, 0.8))
-                .with_width(1.0));
+            frame.stroke(&Path::circle(c, r), Stroke::default().with_color(rim).with_width(1.0));
         });
         let mut marker = Frame::new(renderer, bounds.size());
         let (h, s, _) = self.hsv;

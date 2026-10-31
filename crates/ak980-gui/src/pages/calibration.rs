@@ -5,7 +5,7 @@
 use std::time::Duration;
 
 use ak980_core::device::{self, Calibration, WiredKeyboard};
-use ak980_core::effects;
+use ak980_core::{effects, engine};
 use ak980_core::i18n::tr;
 use ak980_core::{layout, profiles};
 use iced::widget::{column, row, text, toggler};
@@ -19,11 +19,18 @@ pub struct State {
     /// Every key shows the test colour.
     pub showing: bool,
     pub test: [u8; 3],
+    /// A frame is on its way to the keyboard.
+    sending: bool,
+    /// Something changed while it was: send the latest once it is there, so frames never overtake
+    /// each other and the keys end up showing what the sliders say.
+    again: bool,
+    /// The lighting is to go back once the frame on its way is there.
+    give_back: bool,
 }
 
 impl Default for State {
     fn default() -> Self {
-        Self { showing: false, test: [255, 255, 255] }
+        Self { showing: false, test: [255, 255, 255], sending: false, again: false, give_back: false }
     }
 }
 
@@ -61,9 +68,16 @@ fn show(app: &mut App) -> Task<Message> {
         app.calibration.showing = false;
         return Task::none();
     }
+    if app.calibration.sending {
+        app.calibration.again = true;
+        return Task::none();
+    }
+    app.calibration.sending = true;
     let (c, calibration) = (app.calibration.test, app.cfg.settings.calibration());
     Task::perform(
         blocking(move || {
+            // PC effects pause meanwhile (the window keeps the hold fresh on every poll)
+            engine::hold_lighting(true);
             let (leds, _) = layout::positions();
             let colour = c.map(|v| v as f32 / 255.0);
             let table = effects::to_bytes(&vec![colour; leds.len()], leds, 1.0);
@@ -79,22 +93,37 @@ fn show(app: &mut App) -> Task<Message> {
     )
 }
 
-/// The profile's own lighting back on the keyboard after the test colour.
+/// The profile's own lighting back on the keyboard after the test colour, once the frame on its
+/// way (if any) is there.
 pub fn give_lighting_back(app: &mut App) -> Task<Message> {
     app.calibration.showing = false;
+    app.calibration.again = false;
     if !app.wired() {
+        engine::hold_lighting(false);
         return Task::none();
     }
+    if app.calibration.sending {
+        app.calibration.give_back = true;
+        return Task::none();
+    }
+    app.calibration.sending = true;
     let profile = app.cfg.profile().clone();
-    Task::perform(
-        blocking(move || {
-            WiredKeyboard::open()
-                .and_then(|mut kb| profiles::apply_lighting(&mut kb, &profile))
-                .err()
-                .map(|e| e.to_string())
-        }),
-        |r| wrap(Msg::Shown(r.flatten())),
-    )
+    Task::perform(blocking(move || lighting_back(&profile)), |r| wrap(Msg::Shown(r.flatten())))
+}
+
+/// The same, at once and on this thread, for a window that is closing with the test colour shown.
+pub fn give_lighting_back_now(app: &mut App) {
+    if std::mem::take(&mut app.calibration.showing) || app.calibration.give_back {
+        engine::hold_lighting(false);
+        if app.wired() {
+            let _ = lighting_back(app.cfg.profile());
+        }
+    }
+}
+
+fn lighting_back(profile: &ak980_core::config::Profile) -> Option<String> {
+    engine::hold_lighting(false);
+    WiredKeyboard::open().and_then(|mut kb| profiles::apply_lighting(&mut kb, profile)).err().map(|e| e.to_string())
 }
 
 /// A test colour picked on the colour wheel.
@@ -140,9 +169,18 @@ pub fn update(app: &mut App, msg: Msg) -> Task<Message> {
         }
         Msg::Test(c) => set_test_color(app, c),
         Msg::Shown(error) => {
+            app.calibration.sending = false;
+            if std::mem::take(&mut app.calibration.give_back) {
+                return give_lighting_back(app);
+            }
             if let Some(e) = error {
                 app.calibration.showing = false;
+                app.calibration.again = false;
                 app.notify(e, true);
+                return Task::none();
+            }
+            if std::mem::take(&mut app.calibration.again) && app.calibration.showing {
+                return show(app);
             }
             Task::none()
         }
