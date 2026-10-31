@@ -55,7 +55,6 @@ pub enum Msg {
     OverlayNotifications(bool),
     Key(KeyEvent),
     Sent(Option<String>),
-
 }
 
 fn wrap(m: Msg) -> Message {
@@ -222,6 +221,12 @@ pub fn animating(app: &App) -> bool {
     let p = app.cfg.profile();
     app.page == Page::Lighting
         && (p.light_source == LightSource::Host || (p.light_source == LightSource::Firmware && reacts_to_keys(p.lighting.mode)))
+}
+
+/// Only the typing of a keyboard effect that reacts to keys is animated, nothing computed here.
+pub fn typing_preview(app: &App) -> bool {
+    let p = app.cfg.profile();
+    app.page == Page::Lighting && p.light_source == LightSource::Firmware && reacts_to_keys(p.lighting.mode)
 }
 
 /// "Single on" lights the key being pressed, "Single off" darkens it: the drawing shows them typing.
@@ -530,6 +535,12 @@ fn pc_effect(app: &App) -> Element<'_, Message> {
         tr("Runs while this window is open. Turn on the background agent (Device page) to keep it running.")
     };
     let mut col = column![section(tr("PC effects"), card(rows)), caption(who)].spacing(8);
+    if !app.wired() {
+        // Chosen over 2.4 GHz, a PC effect shows nothing until the cable comes, and then it takes over
+        col = col.push(widgets::body(tr("PC effects need the cable. Over 2.4 GHz the keyboard keeps showing its own \
+                                         effect; once it is on the cable, this PC effect takes its place. To keep the \
+                                         keyboard's own effect, choose it under On the keyboard itself.")));
+    }
     if info.needs_keys {
         col = col.push(caption(tr("Click keys on the drawing to try it.")));
     } else if movable_centre(app).is_some() {

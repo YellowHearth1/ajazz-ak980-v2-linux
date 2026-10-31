@@ -68,7 +68,8 @@ fn build() -> Command {
         .after_help(tr!("Without a command the app window opens. Docs: {url}", url = ak980_core::HOMEPAGE))
         .subcommand_value_name(tr("command"))
         .arg(Arg::new("lang").long("lang").global(true).value_parser(["auto", "en", "uk"]).help(tr("interface language")))
-        .subcommand(sub("gui", tr("open the app window")).arg(flag("tray", tr("start hidden in the tray"))))
+        // --tray is still taken (an autostart entry may have it) but there is no tray yet: it opens the window
+        .subcommand(sub("gui", tr("open the app window")).arg(flag("tray", tr("start hidden in the tray")).hide(true)))
         .subcommand(
             sub("status", tr("connection, battery, profile, agent"))
                 .arg(flag("json", tr("print it as JSON, for scripts")))
@@ -222,8 +223,8 @@ fn build() -> Command {
                         .arg(Arg::new("effect").long("effect")
                             .value_parser(effects::ATTENTION.map(|(id, _)| id).to_vec()))
                         .arg(color_arg("color"))
-                        .arg(Arg::new("days").long("days").value_name("1,2,3")
-                            .help(tr("days of the week, Sunday = 0; none: every day")))
+                        .arg(Arg::new("days").long("days").value_name("1,2,3").value_parser(parse_days)
+                            .help(tr("days of the week: numbers (Sunday = 0 or 7) or mon, tue, …; none: every day")))
                         .arg(flag("screen", tr("show the text on the screen too (writes the screen twice)"))),
                 )
                 .subcommand(Command::new("rm").arg(Arg::new("index").required(true).value_parser(value_parser!(usize))))
@@ -319,8 +320,8 @@ fn cmd_remind(m: &ArgMatches, cfg: &mut Config) -> Result<()> {
             if let Some(c) = sub.get_one::<[u8; 3]>("color") {
                 r.color = *c;
             }
-            if let Some(days) = sub.get_one::<String>("days") {
-                r.days = days.split(',').filter_map(|d| d.trim().parse::<u8>().ok()).filter(|d| *d < 7).collect();
+            if let Some(days) = sub.get_one::<Vec<u8>>("days") {
+                r.days.clone_from(days);
             }
             cfg.settings.reminders.push(r);
             cfg.settings.reminders.sort_by(|a, b| a.time.cmp(&b.time));
@@ -486,9 +487,7 @@ fn local_date(secs: u64) -> String {
 fn cmd_battery(m: &ArgMatches, cfg: &mut Config) -> Result<()> {
     let path = paths::battery_measurements();
     if m.get_flag("reset") {
-        if path.exists() {
-            std::fs::remove_file(&path)?;
-        }
+        battery::Measurements::started_over(battery::now()).save(&path)?;
         say(tr("The measured cycles are forgotten; the agent measures again from the readings to come."));
         return Ok(());
     }
@@ -642,6 +641,25 @@ fn cmd_effects() {
     for e in &EFFECTS {
         say(format!("  {:10} {} — {}", e.id, tr(e.name), tr(e.description)));
     }
+}
+
+/// `1,3,5` or `mon,wed,fri` as `Reminder::days` (Sunday = 0); anything else is an error rather
+/// than a day dropped, which could leave none and so mean every day.
+fn parse_days(s: &str) -> std::result::Result<Vec<u8>, String> {
+    const NAMES: [&str; 7] = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+    let mut days = vec![];
+    for part in s.split(',').map(|p| p.trim().to_lowercase()).filter(|p| !p.is_empty()) {
+        let day = match part.parse::<u8>() {
+            Ok(n @ 0..=6) => n,
+            Ok(7) => 0,
+            _ => NAMES.iter().position(|n| part.len() >= 3 && n.starts_with(part.as_str()))
+                .ok_or_else(|| tr!("Not a day of the week: {day} (write 0–7 or mon, tue, …)", day = part))? as u8,
+        };
+        if !days.contains(&day) {
+            days.push(day);
+        }
+    }
+    Ok(days)
 }
 
 /// `R,G,B`, each 40–100.
@@ -1188,6 +1206,15 @@ mod tests {
     #[test]
     fn the_command_line_is_well_formed() {
         build().debug_assert();
+    }
+
+    #[test]
+    fn reminder_days_are_numbers_or_names_and_nothing_is_dropped() {
+        assert_eq!(parse_days("1,3,5"), Ok(vec![1, 3, 5]));
+        assert_eq!(parse_days("mon, Fri,sunday,7"), Ok(vec![1, 5, 0]));
+        assert!(parse_days("mon,funday").is_err(), "an unknown day is an error, not every day");
+        assert!(parse_days("8").is_err());
+        assert!(parse_days("mo").is_err(), "too short to tell");
     }
 
     #[test]
