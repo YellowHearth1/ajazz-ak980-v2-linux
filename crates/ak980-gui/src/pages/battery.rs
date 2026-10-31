@@ -54,8 +54,8 @@ pub fn update(app: &mut App, msg: Msg) -> Task<Message> {
             Task::none()
         }
         Msg::StartOver => {
-            let path = paths::battery_measurements();
-            if let Err(e) = std::fs::remove_file(&path).or_else(|e| if path.exists() { Err(e) } else { Ok(()) }) {
+            // Kept as a start time rather than deleted, or the agent would learn the old cycles again
+            if let Err(e) = Measurements::started_over(battery::now()).save(&paths::battery_measurements()) {
                 app.notify(e.to_string(), true);
             }
             load()

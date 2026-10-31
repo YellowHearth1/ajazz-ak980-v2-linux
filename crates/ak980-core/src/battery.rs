@@ -96,6 +96,9 @@ pub struct Measurements {
     pub charge_curve: Vec<(u8, u64)>,
     /// When the keyboard went onto the cable in wired mode, and its last level before.
     pub cable_since: Option<(u64, u8)>,
+    /// The measurements were started over at this time (Unix seconds): readings from before it
+    /// are not learnt from again.
+    pub since: u64,
 }
 
 /// A rise or fall this small does not end a discharge or a charge: the level wobbles a little.
@@ -188,6 +191,11 @@ pub fn last_charge(history: &[(u64, u8)]) -> Option<(Measured, Vec<(u8, u64)>)> 
     Some((m, curve))
 }
 
+/// Unix seconds now, as the record counts time.
+pub fn now() -> u64 {
+    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs()
+}
+
 impl Measurements {
     pub fn load(path: &Path) -> Self {
         fs::read_to_string(path).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default()
@@ -197,8 +205,15 @@ impl Measurements {
         crate::service::write_atomic(path, &serde_json::to_string_pretty(self).map_err(io::Error::other)?)
     }
 
+    /// Measurements started over `now`: the record stays, but nothing from before is learnt again.
+    pub fn started_over(now: u64) -> Self {
+        Self { since: now, ..Self::default() }
+    }
+
     /// Takes in the cycles of `history` not seen before; whether anything was new.
     pub fn learn(&mut self, history: &[(u64, u8)]) -> bool {
+        let start = history.partition_point(|(t, _)| *t < self.since);
+        let history = &history[start..];
         let mut changed = false;
         if let Some(d) = last_discharge(history)
             && !self.discharges.iter().any(|m| m.end == d.end)
@@ -399,6 +414,11 @@ mod tests {
         assert!(m.learn(&aged));
         let (share, cycles) = m.condition().unwrap();
         assert!((share - 0.9).abs() < 0.01 && cycles == 2, "{share}");
+
+        // Started over: the cycles already in the record are not learnt again
+        let mut fresh = Measurements::started_over(aged.last().unwrap().0 + 1);
+        assert!(!fresh.learn(&aged));
+        assert!(fresh.discharges.is_empty() && fresh.charges.is_empty());
     }
 
     #[test]

@@ -650,7 +650,6 @@ pub fn save_history(frames: &[(RgbImage, u32)], source: Option<&Path>) -> Result
     Ok(folder)
 }
 
-/// Saved uploads, newest first (paths to their screen.gif).
 /// A short animation that calls for attention: `text` as large as it fits, blinking (on for half a
 /// second, off for a quarter). Two frames are 32 pages of the screen's memory, about 5 s to send.
 pub fn reminder_animation(text: &str, color: [u8; 3]) -> Vec<(RgbImage, u32)> {
@@ -675,6 +674,7 @@ pub fn last_upload() -> Option<PathBuf> {
     history_entries().into_iter().next()
 }
 
+/// Saved uploads, newest first (paths to their screen.gif).
 pub fn history_entries() -> Vec<PathBuf> {
     let mut names: Vec<PathBuf> = fs::read_dir(paths::history_dir())
         .map(|rd| rd.filter_map(|e| e.ok()).map(|e| e.path()).collect())
