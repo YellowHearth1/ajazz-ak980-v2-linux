@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.0.5 — 2026-10-31
+
+> **Written entirely by artificial intelligence.** The author needed software like this for the
+> keyboard but does not have the skills to write it, and asked Claude, a large language model made by
+> Anthropic, to make it. Use it at your own risk and expect mistakes.
+
+Fixes from a review of 0.0.3 and 0.0.4:
+
+- Clock: a change of time zone (the clocks going back, travel) that came while the computer slept or
+  the keyboard was unplugged was taken for the wake or the reconnect, which the daily and weekly
+  settings wait on, so the keyboard could stay an hour off for a week. Every reason is weighed now,
+  and a sync that failed is tried again even while the hourly tick comes.
+- The clock-only system service leaves the clock to a running user agent, which keeps to the chosen
+  setting; on its own it set the clock, and so showed the clock page, on every connection.
+- Reminders: one whose minute the computer slept through still comes, up to 15 minutes late; an
+  agent restarted just after one does not bring it again; two reminders never write the screen at
+  once.
+- LED colours: a change reaches a running PC effect at once (it could keep the old balance until
+  the keyboard was reconnected); the test colour is no longer covered by a PC effect, frames from
+  quick slider moves no longer overtake each other, and closing the window or leaving the page gives
+  the keys their lighting back.
+- Battery calibration: *Start over* and `ak980 battery --reset` stick; the agent learnt the old
+  cycles again within a minute.
+- Lighting: choosing PC effects while the keyboard is on 2.4 GHz says that the effect takes over once
+  the cable is connected (until then the keyboard keeps its own effect).
+- `ak980 remind add --days` takes day names (`mon,fri`) and refuses what is not a day, instead of
+  dropping it and so making the reminder come every day.
+- The Single on and Single off typing preview draws at half the rate; the colour wheel follows a
+  change of theme; leaving LED colours for Device or Battery calibration loads that page.
+- `ak980 gui --tray` is no longer offered: there is no tray yet (it still opens the window).
+- README: the clock row of the feature table describes the weekly default.
+
 ## 0.0.4 — 2026-10-30
 
 > **Written entirely by artificial intelligence.** The author needed software like this for the

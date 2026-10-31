@@ -64,7 +64,7 @@ the project has gone another way, and it is no longer developed.
 
 | | USB cable | 2.4 GHz dongle |
 |---|---|---|
-| Keep the screen clock in sync (on connect, after sleep, at midnight, hourly) | yes | yes |
+| Keep the screen clock right: once a week by default (or daily, hourly, only when asked), at once when the time zone changes | yes | yes |
 | GIFs, pictures and frame folders on the 240×135 screen, with a frame editor | yes | no (firmware) |
 | 19 lighting effects of the keyboard: colour, rainbow, brightness, speed, direction | yes | no (firmware) |
 | Per-key colours, painted on a drawing of the keyboard | yes | no (firmware) |

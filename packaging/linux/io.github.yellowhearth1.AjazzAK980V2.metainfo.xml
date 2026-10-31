@@ -49,6 +49,13 @@
   </categories>
   <content_rating type="oars-1.1"/>
   <releases>
+    <release version="0.0.5" date="2026-10-31">
+      <description>
+        <p>Fixes from a review: the clock follows a change of time zone that came during sleep, reminders
+        missed while the computer slept still come, LED colour changes reach PC effects at once, and
+        starting the battery measurements over sticks.</p>
+      </description>
+    </release>
     <release version="0.0.4" date="2026-10-30">
       <description>
         <p>One package for every init system, built with git clone, cd and makepkg -si: the app

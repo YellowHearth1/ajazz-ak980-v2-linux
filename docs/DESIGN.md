@@ -1,5 +1,5 @@
 ---
-version: 0.0.4
+version: 0.0.5
 name: Ajazz AK980 V2 | Software for Linux
 description: A configurator for one specific keyboard, built around a faithful drawing of that keyboard, for people who game and type on it every day.
 source: crates/ak980-gui/src/theme.rs (every value below lives there)
@@ -101,4 +101,5 @@ options are segmented and wrap onto a second line when the window is narrow. The
 - Icon-only buttons have tooltips. Everything works with the mouse alone.
 - Colours are picked on a colour wheel (hue around, saturation outwards), next to swatches and a hex
   field.
-- Agent notifications go through `notify-send`: a lost 2.4 GHz link, a battery at 20 % and 10 %.
+- Agent notifications go through `notify-send`: a lost 2.4 GHz link, a battery at 20 % and 10 %,
+  reminders.

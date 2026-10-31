@@ -12,7 +12,7 @@
 # system check it first.
 
 pkgname=ajazz-ak980-v2-linux
-pkgver=0.0.4
+pkgver=0.0.5
 pkgrel=1
 pkgdesc="Ajazz AK980 V2 | Software for Linux: screen clock and GIFs, lighting, PC lighting effects, keys, macros, profiles"
 arch=(x86_64 aarch64)
