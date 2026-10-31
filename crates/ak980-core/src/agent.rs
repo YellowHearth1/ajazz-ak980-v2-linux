@@ -388,6 +388,26 @@ pub fn clock_due(policy: &str, cause: ClockCause, since_last: Option<Duration>) 
     }
 }
 
+/// The first of `causes` that makes setting the clock due, if any does.
+pub fn first_due(causes: &[ClockCause], policy: &str, since_last: Option<Duration>) -> Option<ClockCause> {
+    causes.iter().copied().find(|c| clock_due(policy, *c, since_last))
+}
+
+/// Whether some user's agent runs (`ak980 agent` without `--system`). The system service leaves the
+/// clock to it then: the user's agent knows how often the user wants it set, the system one runs
+/// as nobody and keeps no record, so it would set it on every connection.
+fn user_agent_running() -> bool {
+    let me = std::process::id().to_string();
+    let Ok(procs) = fs::read_dir("/proc") else { return false };
+    procs.filter_map(|e| e.ok()).filter(|e| e.file_name() != me.as_str()).any(|e| {
+        let Ok(cmdline) = fs::read(e.path().join("cmdline")) else { return false };
+        let args: Vec<&[u8]> = cmdline.split(|b| *b == 0).filter(|a| !a.is_empty()).collect();
+        args.first().is_some_and(|a| a.ends_with(b"/ak980") || *a == b"ak980")
+            && args.get(1).is_some_and(|a| *a == b"agent" || *a == b"daemon")
+            && !args.iter().any(|a| *a == b"--system")
+    })
+}
+
 /// How long ago the agent last set the clock, from its record.
 fn clock_synced_ago() -> Option<Duration> {
     let secs: u64 = fs::read_to_string(paths::clock_record()).ok()?.trim().parse().ok()?;
@@ -485,6 +505,18 @@ pub fn run_launcher(command: &str) {
 
 // ------------------------------------------------------------ reminders
 
+/// How late a reminder still comes when the agent missed its minute (the computer slept, say).
+const REMINDER_GRACE_MINUTES: u16 = 15;
+
+/// Which reminder this is, for bringing it once a day.
+fn reminder_key(r: &Reminder) -> String {
+    format!("{}|{}", r.time, r.text)
+}
+
+/// Held while the agent sends a reminder's text or the animation back, so that two of them never
+/// write the screen at once.
+static SCREEN: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 /// While a reminder's text is on the screen: the animation to put back afterwards. A file, so that
 /// an agent stopped in between puts it back when it starts again.
 fn screen_marker() -> std::path::PathBuf {
@@ -500,6 +532,8 @@ fn upload_frames(frames: &[(image::RgbImage, u32)], slot: u8) -> Result<()> {
 
 /// Puts the animation named in the marker back on the screen, if a reminder's text is still there.
 fn restore_screen(slot: u8) {
+    let _screen = SCREEN.lock().unwrap_or_else(|e| e.into_inner());
+    // Gone if another restore has put the animation back meanwhile
     let Ok(path) = fs::read_to_string(screen_marker()) else { return };
     let path = std::path::PathBuf::from(path.trim());
     let o = RenderOptions { dither: false, ..RenderOptions::default() };
@@ -520,13 +554,16 @@ fn screen_reminder(text: String, color: [u8; 3], minutes: u32, slot: u8) {
             warn!("no animation sent from this app to put back, so the reminder's text stays off the screen");
             return;
         };
-        if let Err(e) = upload_frames(&lcd::reminder_animation(&text, color), slot) {
-            warn!("cannot show the reminder on the screen: {e}");
-            return;
+        {
+            let _screen = SCREEN.lock().unwrap_or_else(|e| e.into_inner());
+            if let Err(e) = upload_frames(&lcd::reminder_animation(&text, color), slot) {
+                warn!("cannot show the reminder on the screen: {e}");
+                return;
+            }
+            let marker = screen_marker();
+            let _ = marker.parent().map(fs::create_dir_all);
+            let _ = fs::write(&marker, back.to_string_lossy().as_bytes());
         }
-        let marker = screen_marker();
-        let _ = marker.parent().map(fs::create_dir_all);
-        let _ = fs::write(&marker, back.to_string_lossy().as_bytes());
         wait(&STOP, Duration::from_secs(60 * u64::from(minutes.max(1))));
         if !STOP.load(Ordering::SeqCst) {
             restore_screen(slot);
@@ -775,6 +812,17 @@ impl Agent {
         let mut next_switch = Instant::now();
         info!("ak980 agent started ({} mode)", if self.system { "system" } else { "user" });
 
+        // Reminders whose minute had already passed when the agent started are not brought late:
+        // an agent restarted just after one would bring it twice
+        if let Some(c) = &cfg {
+            let t = LocalTime::now();
+            for r in &c.settings.reminders {
+                if r.came_due(t.hour, t.minute, t.weekday, REMINDER_GRACE_MINUTES) && !r.due(t.hour, t.minute, t.weekday) {
+                    self.reminded.insert(reminder_key(r), t.date());
+                }
+            }
+        }
+
         let code = loop {
             if STOP.load(Ordering::SeqCst) {
                 break 0;
@@ -800,35 +848,47 @@ impl Agent {
                 None
             };
 
-            let mut cause: Option<ClockCause> = None;
-            if now_present.is_some() && now_present != present {
-                cause = Some(ClockCause::Connected);
-            } else if now_present.is_some() {
+            // Every reason there is now, not only the first: a zone change while asleep or unplugged
+            // must not be lost to the wake or the reconnect that comes with it, which the setting
+            // may wait on, and a periodic tick must not hide a sync that is due again
+            let mut causes: Vec<ClockCause> = vec![];
+            if now_present.is_some() {
+                if now_present != present {
+                    causes.push(ClockCause::Connected);
+                }
                 if (wall() - wall_ref).abs() > 2.0 {
-                    cause = Some(ClockCause::TimeJump);
-                } else if tz_key() != tz {
-                    cause = Some(ClockCause::ZoneChanged);
-                } else if LocalTime::now().date() != day {
-                    cause = Some(ClockCause::NewDay);
-                } else if last_sync.is_some_and(|t| t.elapsed() > interval) {
-                    cause = Some(ClockCause::Periodic);
-                } else if retry_at.is_some_and(|t| Instant::now() >= t) {
-                    cause = Some(ClockCause::Retry);
+                    causes.push(ClockCause::TimeJump);
+                }
+                if tz_key() != tz {
+                    causes.push(ClockCause::ZoneChanged);
+                }
+                if LocalTime::now().date() != day {
+                    causes.push(ClockCause::NewDay);
+                }
+                if retry_at.is_some_and(|t| Instant::now() >= t) {
+                    causes.push(ClockCause::Retry);
+                }
+                if last_sync.is_some_and(|t| t.elapsed() > interval) {
+                    causes.push(ClockCause::Periodic);
                 }
             }
-            if cause.is_some() {
+            let connected = causes.contains(&ClockCause::Connected);
+            if !causes.is_empty() {
                 // Seen, whether or not the setting lets it set the clock
                 wall_ref = wall();
                 tz = tz_key();
                 day = LocalTime::now().date();
             }
-            let policy = if settings.clock_auto { settings.clock_sync.as_str() } else { "manual" };
-            // The system agent has no record of its own; it sets the clock as it always did
+            let defer = self.system && !causes.is_empty() && user_agent_running();
+            let policy = if settings.clock_auto && !defer { settings.clock_sync.as_str() } else { "manual" };
+            // The system agent keeps no record (it runs as nobody), so with "daily" or "weekly" it
+            // sets the clock whenever the keyboard connects, the computer wakes or a day begins
             let since = if self.system { None } else { clock_synced_ago() };
             // `--once` is asked for by hand or by a timer: it syncs whatever the setting says
-            let reason = cause.filter(|c| once || clock_due(policy, *c, since)).map(|c| c.text(now_present));
-            if let Some(c) = cause.filter(|_| reason.is_none() && !once) {
-                debug!("clock not set ({}): the setting is {policy}", c.text(now_present));
+            let due = if once { causes.first().copied() } else { first_due(&causes, policy, since) };
+            let reason = due.map(|c| c.text(now_present));
+            if due.is_none() && !once && causes.iter().any(|c| *c != ClockCause::Periodic) {
+                debug!("clock not set ({}): the setting is {policy}", causes[0].text(now_present));
             }
             if now_present != present && !once && !self.system {
                 link_event(&format!(
@@ -857,7 +917,7 @@ impl Agent {
             }
 
             if let Some(reason) = reason.as_deref() {
-                if reason.starts_with("connected") && !once {
+                if connected && !once {
                     wait(&STOP, Duration::from_secs(2)); // let the firmware bring up every interface
                 }
                 let via = sync_clock_once(settings.clock_slot).unwrap_or_else(|e| {
@@ -885,16 +945,16 @@ impl Agent {
             if !once && !self.system {
                 let t = LocalTime::now();
                 let due: Vec<Reminder> = settings.reminders.iter()
-                    .filter(|r| r.due(t.hour, t.minute, t.weekday))
-                    .filter(|r| self.reminded.get(&format!("{}|{}", r.time, r.text)) != Some(&t.date()))
+                    .filter(|r| r.came_due(t.hour, t.minute, t.weekday, REMINDER_GRACE_MINUTES))
+                    .filter(|r| self.reminded.get(&reminder_key(r)) != Some(&t.date()))
                     .cloned()
                     .collect();
                 for r in due {
-                    self.reminded.insert(format!("{}|{}", r.time, r.text), t.date());
+                    self.reminded.insert(reminder_key(&r), t.date());
                     self.remind(&r, settings.lcd_slot);
                 }
                 // A reminder's text left on the screen by an agent that stopped: put the animation back
-                if cause == Some(ClockCause::Connected) && now_present == Some("usb") && screen_marker().exists() {
+                if connected && now_present == Some("usb") && screen_marker().exists() {
                     let slot = settings.lcd_slot;
                     let _ = std::thread::Builder::new().name("ak980-screen".into()).spawn(move || restore_screen(slot));
                 }
@@ -1022,6 +1082,20 @@ mod tests {
         assert!(!clock_due("weekly", NewDay, Some(3 * day)));
         assert!(clock_due("weekly", Connected, Some(7 * day)));
         assert!(clock_due("weekly", TimeJump, None));
+    }
+
+    #[test]
+    fn a_due_cause_is_not_lost_to_another_one_at_the_same_time() {
+        let day = Duration::from_secs(24 * 3600);
+        use ClockCause::*;
+        // Woken after the clocks went back an hour: the wake waits for the week, the zone does not
+        assert_eq!(first_due(&[TimeJump, ZoneChanged, NewDay], "weekly", Some(day)), Some(ZoneChanged));
+        // Plugged in after the zone changed
+        assert_eq!(first_due(&[Connected, ZoneChanged], "daily", Some(day / 4)), Some(ZoneChanged));
+        // A failed sync is tried again while the hourly tick keeps coming
+        assert_eq!(first_due(&[Retry, Periodic], "weekly", Some(day)), Some(Retry));
+        assert_eq!(first_due(&[Periodic], "weekly", Some(day)), None);
+        assert_eq!(first_due(&[Connected, TimeJump], "weekly", Some(day)), None);
     }
 
     #[test]

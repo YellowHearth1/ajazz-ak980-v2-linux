@@ -194,9 +194,15 @@ impl Reminder {
 
     /// Whether it comes on at `hour:minute` of a day that is `weekday` (Sunday = 0).
     pub fn due(&self, hour: u8, minute: u8, weekday: u8) -> bool {
-        self.enabled
-            && self.hour_minute() == Some((hour, minute))
-            && (self.days.is_empty() || self.days.contains(&weekday))
+        self.came_due(hour, minute, weekday, 0)
+    }
+
+    /// Whether its time came at most `grace` minutes before `hour:minute` today, a day that is
+    /// `weekday`: a computer that slept through the minute still brings it, a little late.
+    pub fn came_due(&self, hour: u8, minute: u8, weekday: u8, grace: u16) -> bool {
+        let Some((h, m)) = self.hour_minute().filter(|_| self.enabled) else { return false };
+        let (at, now) = (u16::from(h) * 60 + u16::from(m), u16::from(hour) * 60 + u16::from(minute));
+        at <= now && now - at <= grace && (self.days.is_empty() || self.days.contains(&weekday))
     }
 }
 
@@ -667,6 +673,11 @@ mod tests {
         assert!(every_day.due(23, 59, 6));
         assert!(!Reminder { enabled: false, ..every_day.clone() }.due(23, 59, 6));
         assert_eq!(Reminder { time: "25:00".into(), ..Reminder::default() }.hour_minute(), None);
+        // Asleep at 09:05 and woken at 09:12: still brought, but not hours later or before its time
+        assert!(r.came_due(9, 12, 1, 15));
+        assert!(!r.came_due(9, 30, 1, 15));
+        assert!(!r.came_due(9, 4, 1, 15));
+        assert!(!r.came_due(9, 12, 0, 15), "not on Sunday");
     }
 
     #[test]
