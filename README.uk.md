@@ -10,7 +10,32 @@
 
 ---
 
+<div align="center">
+
 # Ajazz AK980 V2 | Software for Linux
+
+<a href="https://www.rust-lang.org"><img alt="Rust 1.88+" src="https://img.shields.io/badge/Rust-1.88%2B-B7410E?style=for-the-badge&logo=rust&logoColor=white"></a>
+<a href="https://iced.rs"><img alt="GUI: iced" src="https://img.shields.io/badge/GUI-iced-3645FF?style=for-the-badge"></a>
+<a href="https://artixlinux.org"><img alt="Artix | Arch Linux" src="https://img.shields.io/badge/Artix%20%7C%20Arch-Linux-10A0CC?style=for-the-badge&logo=artixlinux&logoColor=white"></a>
+
+<img alt="init: systemd, dinit, OpenRC, runit, s6" src="https://img.shields.io/badge/init-systemd%20%C2%B7%20dinit%20%C2%B7%20OpenRC%20%C2%B7%20runit%20%C2%B7%20s6-4E9A06?style=for-the-badge">
+<img alt="systemd: не обов’язковий" src="https://img.shields.io/badge/systemd-optional-CC0000?style=for-the-badge">
+<img alt="Клавіатура: AJAZZ AK980 V2" src="https://img.shields.io/badge/keyboard-AJAZZ%20AK980%20V2-F2CF2E?style=for-the-badge">
+
+<a href="LICENSE"><img alt="Ліцензія: MIT" src="https://img.shields.io/badge/license-MIT-1E5AA8?style=for-the-badge"></a>
+<a href="README.md"><img alt="UI: English, Українська" src="https://img.shields.io/badge/UI-English%20%C2%B7%20%D0%A3%D0%BA%D1%80%D0%B0%D1%97%D0%BD%D1%81%D1%8C%D0%BA%D0%B0-0057B7?style=for-the-badge"></a>
+<img alt="Написав Claude (ШІ)" src="https://img.shields.io/badge/written%20by-Claude%20(AI)-D97757?style=for-the-badge&logo=claude&logoColor=white">
+<a href="https://github.com/YellowHearth1/ajazz-ak980-v2-linux/pulls"><img alt="PRs welcome" src="https://img.shields.io/badge/PRs-welcome-2EA44F?style=for-the-badge"></a>
+
+<a href="https://github.com/YellowHearth1/ajazz-ak980-v2-linux/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/YellowHearth1/ajazz-ak980-v2-linux/ci.yml?branch=main&style=flat-square&label=CI&logo=github"></a>
+<a href="https://github.com/YellowHearth1/ajazz-ak980-v2-linux/releases/latest"><img alt="Реліз" src="https://img.shields.io/github/v/release/YellowHearth1/ajazz-ak980-v2-linux?style=flat-square&label=%D1%80%D0%B5%D0%BB%D1%96%D0%B7"></a>
+<img alt="Завантаження" src="https://img.shields.io/github/downloads/YellowHearth1/ajazz-ak980-v2-linux/total?style=flat-square&label=%D0%B7%D0%B0%D0%B2%D0%B0%D0%BD%D1%82%D0%B0%D0%B6%D0%B5%D0%BD%D0%BD%D1%8F">
+<img alt="Останній коміт" src="https://img.shields.io/github/last-commit/YellowHearth1/ajazz-ak980-v2-linux?style=flat-square&label=%D0%BE%D1%81%D1%82%D0%B0%D0%BD%D0%BD%D1%96%D0%B9%20%D0%BA%D0%BE%D0%BC%D1%96%D1%82">
+<img alt="Зірки" src="https://img.shields.io/github/stars/YellowHearth1/ajazz-ak980-v2-linux?style=flat-square&label=%D0%B7%D1%96%D1%80%D0%BA%D0%B8">
+<img alt="Issues" src="https://img.shields.io/github/issues/YellowHearth1/ajazz-ak980-v2-linux?style=flat-square">
+<img alt="Розмір" src="https://img.shields.io/github/repo-size/YellowHearth1/ajazz-ak980-v2-linux?style=flat-square&label=%D1%80%D0%BE%D0%B7%D0%BC%D1%96%D1%80">
+
+</div>
 
 > [!WARNING]
 > **Цю програму повністю написав штучний інтелект.** Її авторові потрібна була така програма для

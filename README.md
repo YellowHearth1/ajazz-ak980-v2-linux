@@ -10,7 +10,32 @@
 
 ---
 
+<div align="center">
+
 # Ajazz AK980 V2 | Software for Linux
+
+<a href="https://www.rust-lang.org"><img alt="Rust 1.88+" src="https://img.shields.io/badge/Rust-1.88%2B-B7410E?style=for-the-badge&logo=rust&logoColor=white"></a>
+<a href="https://iced.rs"><img alt="GUI: iced" src="https://img.shields.io/badge/GUI-iced-3645FF?style=for-the-badge"></a>
+<a href="https://artixlinux.org"><img alt="Artix | Arch Linux" src="https://img.shields.io/badge/Artix%20%7C%20Arch-Linux-10A0CC?style=for-the-badge&logo=artixlinux&logoColor=white"></a>
+
+<img alt="init: systemd, dinit, OpenRC, runit, s6" src="https://img.shields.io/badge/init-systemd%20%C2%B7%20dinit%20%C2%B7%20OpenRC%20%C2%B7%20runit%20%C2%B7%20s6-4E9A06?style=for-the-badge">
+<img alt="systemd: optional" src="https://img.shields.io/badge/systemd-optional-CC0000?style=for-the-badge">
+<img alt="Keyboard: AJAZZ AK980 V2" src="https://img.shields.io/badge/keyboard-AJAZZ%20AK980%20V2-F2CF2E?style=for-the-badge">
+
+<a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-1E5AA8?style=for-the-badge"></a>
+<a href="README.uk.md"><img alt="UI: English, Українська" src="https://img.shields.io/badge/UI-English%20%C2%B7%20%D0%A3%D0%BA%D1%80%D0%B0%D1%97%D0%BD%D1%81%D1%8C%D0%BA%D0%B0-0057B7?style=for-the-badge"></a>
+<img alt="Written by Claude (AI)" src="https://img.shields.io/badge/written%20by-Claude%20(AI)-D97757?style=for-the-badge&logo=claude&logoColor=white">
+<a href="https://github.com/YellowHearth1/ajazz-ak980-v2-linux/pulls"><img alt="PRs welcome" src="https://img.shields.io/badge/PRs-welcome-2EA44F?style=for-the-badge"></a>
+
+<a href="https://github.com/YellowHearth1/ajazz-ak980-v2-linux/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/YellowHearth1/ajazz-ak980-v2-linux/ci.yml?branch=main&style=flat-square&label=CI&logo=github"></a>
+<a href="https://github.com/YellowHearth1/ajazz-ak980-v2-linux/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/YellowHearth1/ajazz-ak980-v2-linux?style=flat-square&label=release"></a>
+<img alt="Downloads" src="https://img.shields.io/github/downloads/YellowHearth1/ajazz-ak980-v2-linux/total?style=flat-square&label=downloads">
+<img alt="Last commit" src="https://img.shields.io/github/last-commit/YellowHearth1/ajazz-ak980-v2-linux?style=flat-square&label=last%20commit">
+<img alt="Stars" src="https://img.shields.io/github/stars/YellowHearth1/ajazz-ak980-v2-linux?style=flat-square&label=stars">
+<img alt="Issues" src="https://img.shields.io/github/issues/YellowHearth1/ajazz-ak980-v2-linux?style=flat-square">
+<img alt="Repository size" src="https://img.shields.io/github/repo-size/YellowHearth1/ajazz-ak980-v2-linux?style=flat-square&label=size">
+
+</div>
 
 > [!WARNING]
 > **This program was written entirely by artificial intelligence.** Its author needed software like
